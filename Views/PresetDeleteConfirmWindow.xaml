@@ -1,0 +1,21 @@
+<Window x:Class="Classify8.Views.PresetDeleteConfirmWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="プリセット削除の確認" Height="200" Width="450"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="このプリセットは現在、いくつかの振り分け条件で使用されています。&#x0a;削除すると、それらの条件でエラーが発生する可能性があります。&#x0a;どのように削除しますか？" 
+                   TextWrapping="Wrap" FontSize="14"/>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15,0,0">
+            <Button Content="個別指定に変換して削除" Width="150" Height="35" Margin="0,0,10,0" Background="#FF4CAF50" Foreground="White" FontWeight="Bold" Click="BtnConvert_Click"/>
+            <Button Content="無視して強制削除" Width="120" Height="35" Margin="0,0,10,0" Background="#FFF44336" Foreground="White" Click="BtnForce_Click"/>
+            <Button Content="キャンセル" Width="90" Height="35" Click="BtnCancel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

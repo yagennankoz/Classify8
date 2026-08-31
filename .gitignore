@@ -1,0 +1,4 @@
+bin/*
+obj/*
+Classify8.Tests/bin/*
+Classify8.Tests/obj/*

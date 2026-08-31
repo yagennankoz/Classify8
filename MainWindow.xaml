@@ -1,0 +1,359 @@
+<Window x:Class="Classify8.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Classify8 - ダッシュボード"
+        Height="600"
+        Width="900"
+        WindowStartupLocation="CenterScreen"
+        Icon="c8_icon.ico"
+        Closing="Window_Closing">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- 0. メニューバー -->
+            <RowDefinition Height="Auto"/>
+            <!-- 1. ツールバー (ボタン類) -->
+            <RowDefinition Height="*"/>
+            <!-- 2. ルール一覧 -->
+            <RowDefinition Height="Auto"/>
+            <!-- 3. ステータス -->
+            <RowDefinition Height="70"/>
+            <!-- 4. 実行ログ -->
+        </Grid.RowDefinitions>
+
+        <!-- ============================== -->
+        <!-- メニューバー                   -->
+        <!-- ============================== -->
+        <Menu Grid.Row="0"
+                Background="#F0F0F0"
+                Padding="5,2"
+                Margin="-10,-10,-10,10">
+            <!-- 振り分け -->
+            <MenuItem Header="振り分け(_S)">
+                <MenuItem Name="miRunSelected"
+                        Header="選択した条件で振り分け実行"
+                        Click="MenuRunSelected_Click"/>
+                <MenuItem Header="すべての条件で振り分け実行"
+                        Click="MenuRunAll_Click"/>
+                <Separator/>
+                <MenuItem Header="振り分け履歴"
+                        Click="MenuHistory_Click"/>
+            </MenuItem>
+
+            <!-- 振り分け条件 -->
+            <MenuItem Header="振り分け条件(_R)">
+                <MenuItem Header="追加"
+                        Click="BtnAddRule_Click"/>
+                <MenuItem Header="編集"
+                        Click="BtnEditRule_Click"/>
+                <MenuItem Header="削除"
+                        Click="BtnDeleteRule_Click"/>
+                <Separator/>
+                <MenuItem Name="miCopy"
+                        Header="コピー"
+                        Click="MenuCopy_Click"/>
+                <MenuItem Name="miCut"
+                        Header="切り取り"
+                        Click="MenuCut_Click"/>
+                <MenuItem Name="miPaste"
+                        Header="貼り付け"
+                        Click="MenuPaste_Click"/>
+                <Separator/>
+                <MenuItem Header="全ての振り分け条件をチェックする"
+                        Click="MenuCheckAll_Click"/>
+                <MenuItem Header="全ての振り分け条件のチェックを外す"
+                        Click="MenuUncheckAll_Click"/>
+                <Separator/>
+                <MenuItem Name="miOpenDest"
+                        Header="振り分け先フォルダを開く"
+                        Click="MenuOpenDest_Click"/>
+            </MenuItem>
+
+            <!-- 設定 -->
+            <MenuItem Header="設定(_O)">
+                <MenuItem Header="オプション"
+                        Click="BtnSettings_Click"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- ============================== -->
+        <!-- 既存のツールバー (※Grid.Row="1") -->
+        <!-- ============================== -->
+        <StackPanel Grid.Row="1"
+                Orientation="Horizontal"
+                Margin="0,0,0,10">
+            <!-- (ここに元々の +ルール追加 などのボタンが並びます。不要なら消してもOKです) -->
+            <Button Name="btnAddRule"
+                    Content="＋ ルール追加"
+                    Width="100"
+                    Height="30"
+                    Margin="0,0,10,0"
+                    Click="BtnAddRule_Click"/>
+            <Button Name="btnEditRule"
+                    Content="編集"
+                    Width="80"
+                    Height="30"
+                    Margin="0,0,10,0"
+                    Click="BtnEditRule_Click"/>
+            <Button Name="btnDeleteRule"
+                    Content="削除"
+                    Width="80"
+                    Height="30"
+                    Margin="0,0,30,0"
+                    Click="BtnDeleteRule_Click"/>
+            <Button Name="btnPreset"
+                    Content="📁 プリセット管理"
+                    Width="120"
+                    Height="30"
+                    Margin="0,0,10,0"
+                    Click="BtnPreset_Click"/>
+            <Button Name="btnRunAll"
+                    Content="▶ すべての条件で振り分け実行"
+                    Width="220"
+                    Height="30"
+                    Margin="0,0,20,0"
+                    Background="#FF4CAF50"
+                    Foreground="White"
+                    FontWeight="Bold"
+                    Click="MenuRunAll_Click"/>
+        </StackPanel>
+
+        <!-- 2. ルール一覧と操作ボタン (中央) -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="50"/>
+                <!-- ボタン用の幅 -->
+            </Grid.ColumnDefinitions>
+
+            <ListView x:Name="lvRules"
+                    Grid.Column="0"
+                      SelectionMode="Extended"
+                      ScrollViewer.VerticalScrollBarVisibility="Auto"
+                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                      AllowDrop="True"
+                      SelectionChanged="LvRules_SelectionChanged"
+                      PreviewMouseLeftButtonDown="LvRules_PreviewMouseLeftButtonDown"
+                      PreviewMouseMove="LvRules_PreviewMouseMove"
+                      DragEnter="LvRules_DragEnter"
+                      Drop="LvRules_Drop"
+                      PreviewKeyDown="LvRules_PreviewKeyDown">
+
+                <ListView.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="追加"
+                                Click="BtnAddRule_Click"/>
+                        <MenuItem Name="ctxEdit"
+                                Header="編集"
+                                Click="BtnEditRule_Click"/>
+                        <MenuItem Name="ctxDelete"
+                                Header="削除"
+                                Click="BtnDeleteRule_Click"/>
+                        <Separator/>
+                        <MenuItem Name="ctxCopy"
+                                Header="コピー"
+                                Click="MenuCopy_Click"/>
+                        <MenuItem Name="ctxCut"
+                                Header="切り取り"
+                                Click="MenuCut_Click"/>
+                        <MenuItem Name="ctxPaste"
+                                Header="貼り付け"
+                                Click="MenuPaste_Click"/>
+                        <Separator/>
+                        <MenuItem Name="ctxRun"
+                                Header="選択した条件で振り分け実行"
+                                Click="MenuRunSelected_Click"/>
+                        <Separator/>
+                        <MenuItem Name="ctxOpenDest"
+                                Header="振り分け先フォルダを開く"
+                                Click="MenuOpenDest_Click"/>
+                    </ContextMenu>
+                </ListView.ContextMenu>
+
+                <ListView.Resources>
+                    <!-- 行全体（横線と選択時の色）の完全カスタムスタイル -->
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment"
+                                Value="Stretch"/>
+                        <Setter Property="VerticalContentAlignment"
+                                Value="Stretch"/>
+                        <Setter Property="Background"
+                                Value="Transparent"/>
+                        <Setter Property="BorderBrush"
+                                Value="LightGray"/>
+                        <Setter Property="BorderThickness"
+                                Value="0,0,0,1"/>
+                        <!-- 下部に横線を引く -->
+                        <Setter Property="Foreground"
+                                Value="Black"/>
+
+                        <!-- OSの標準エフェクトを無効化し、独自のデザインを適用する -->
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListViewItem">
+                                    <Border Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="{TemplateBinding BorderThickness}">
+                                        <GridViewRowPresenter VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+
+                        <!-- マウスオーバー時と選択時の色をトリガーで強制設定 -->
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter Property="Background"
+                                        Value="#E3F2FD"/>
+                                <!-- ホバー時は薄いブルー -->
+                            </Trigger>
+                            <Trigger Property="IsSelected"
+                                    Value="True">
+                                <Setter Property="Background"
+                                        Value="#1976D2"/>
+                                <!-- 選択時は濃いブルー -->
+                                <Setter Property="Foreground"
+                                        Value="White"/>
+                                <!-- 文字色は白 -->
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListView.Resources>
+
+                <ListView.View>
+                    <GridView>
+                        <!-- 有効 (チェックボックス) -->
+                        <GridViewColumn Header="有効"
+                                Width="50">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="LightGray"
+                                            BorderThickness="0,0,1,0"
+                                            Margin="-6,-2,-9,-2">
+                                        <CheckBox IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Click="RuleCheckBox_Click"/>
+                                    </Border>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+
+                        <!-- 名称 -->
+                        <GridViewColumn Header="名称"
+                                Width="150">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="LightGray"
+                                            BorderThickness="0,0,1,0"
+                                            Margin="-6,-2,-9,-2"
+                                            Padding="6,2,6,2">
+                                        <TextBlock Text="{Binding RuleName}"
+                                                VerticalAlignment="Center"/>
+                                    </Border>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+
+                        <!-- 振り分け元 -->
+                        <GridViewColumn Header="振り分け元"
+                                Width="200">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="LightGray"
+                                            BorderThickness="0,0,1,0"
+                                            Margin="-6,-2,-9,-2"
+                                            Padding="6,2,6,2">
+                                        <TextBlock Text="{Binding SourcePathDisplay}"
+                                                VerticalAlignment="Center"/>
+                                    </Border>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+
+                        <!-- 検索条件 -->
+                        <GridViewColumn Header="検索条件"
+                                Width="200">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="LightGray"
+                                            BorderThickness="0,0,1,0"
+                                            Margin="-6,-2,-9,-2"
+                                            Padding="6,2,6,2">
+                                        <TextBlock Text="{Binding SearchCondition}"
+                                                VerticalAlignment="Center"/>
+                                    </Border>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+
+                        <!-- 振り分け先 -->
+                        <GridViewColumn Header="振り分け先"
+                                Width="250">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <!-- 最後の列は縦線不要なので BorderThickness="0"、マージンも右側は余裕を持たせる -->
+                                    <Border BorderBrush="LightGray"
+                                            BorderThickness="0"
+                                            Margin="-6,-2,0,-2"
+                                            Padding="6,2,6,2">
+                                        <TextBlock Text="{Binding DestPathDisplay}"
+                                                VerticalAlignment="Center"/>
+                                    </Border>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+
+            <!-- 順序入れ替えボタン -->
+            <StackPanel Grid.Column="1"
+                    Orientation="Vertical"
+                    VerticalAlignment="Center"
+                    Margin="5,0,0,0">
+                <Button Name="btnMoveUp"
+                        Content="▲"
+                        Height="40"
+                        Margin="0,0,0,10"
+                        Click="BtnMoveUp_Click"
+                        ToolTip="選択したルールを上へ移動"/>
+                <Button Name="btnMoveDown"
+                        Content="▼"
+                        Height="40"
+                        Click="BtnMoveDown_Click"
+                        ToolTip="選択したルールを下へ移動"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- 3. ステータスとプログレスバー (下部) -->
+        <Grid Grid.Row="3"
+                Margin="0,10,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Name="txtStatus"
+                    Grid.Column="0"
+                    Text="待機中..."
+                    VerticalAlignment="Center"
+                    Margin="0,0,10,0"
+                    Width="150"/>
+            <ProgressBar Name="progressBar"
+                    Grid.Column="1"
+                    Height="20"
+                    Minimum="0"
+                    Maximum="100"
+                    Value="0"/>
+        </Grid>
+
+        <!-- 4. 実行ログ (最下部) -->
+        <TextBox Grid.Row="4"
+                Name="txtLog"
+                IsReadOnly="True"
+                VerticalScrollBarVisibility="Auto"
+                Background="#F0F0F0"
+                TextWrapping="Wrap"/>
+    </Grid>
+</Window>

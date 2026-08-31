@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- アプリの形式をWindows画面付きアプリに指定 -->
+    <OutputType>WinExe</OutputType>
+    <!-- 使用する.NETのバージョン（PCにインストールされている最新版に合わせて net8.0-windows 等になります） -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- WPFを使用する設定 -->
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- 暗黙的なusing（自動補完）を有効化 -->
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>c8_icon.ico</ApplicationIcon> 
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="c8_icon.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Classify8.Tests\**" />
+    <Content Remove="Classify8.Tests\**" />
+    <None Remove="Classify8.Tests\**" />
+  </ItemGroup>
+</Project>

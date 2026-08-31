@@ -1,0 +1,104 @@
+<Window x:Class="Classify8.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="全体設定 (オプション)" Width="500" SizeToContent="Height" MinHeight="350"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TabControl Grid.Row="0" Margin="0,0,0,15">
+            <!-- 【同名ファイルの処理】 -->
+            <TabItem Header="同名ファイルの処理">
+                <StackPanel Margin="15">
+                    <TextBlock Text="ファイルサイズが同じ場合:" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <StackPanel Margin="15,0,0,15">
+                        <RadioButton Name="rbSameKeepNewer" Content="新しい日付のファイルを残す" Margin="0,0,0,5"/>
+                        <RadioButton Name="rbSameKeepOlder" Content="古い日付のファイルを残す" Margin="0,0,0,5"/>
+                        <RadioButton Name="rbSameRename" Content="ファイル名を変えて振り分ける" Margin="0,0,0,5"/>
+                        <RadioButton Name="rbSameSkip" Content="振り分けない"/>
+                    </StackPanel>
+
+                    <TextBlock Text="ファイルサイズが違う場合:" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <StackPanel Margin="15,0,0,0">
+                        <RadioButton Name="rbDiffKeepNewer" Content="新しい日付のファイルを残す" Margin="0,0,0,5"/>
+                        <RadioButton Name="rbDiffKeepOlder" Content="古い日付のファイルを残す" Margin="0,0,0,5"/>
+                        <RadioButton Name="rbDiffRename" Content="ファイル名を変えて振り分ける" Margin="0,0,0,5"/>
+                        <RadioButton Name="rbDiffSkip" Content="振り分けない"/>
+                    </StackPanel>
+                </StackPanel>
+            </TabItem>
+
+            <!-- 【振り分けないファイル】 -->
+            <TabItem Header="振り分けないファイル">
+                <StackPanel Margin="15">
+                    <TextBlock Text="NGキーワード:" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBlock Text="※ワイルドカード (*, ?) が使用可能です。&#x0a;※改行で区切った場合はOR条件になります（1行内のスペースはそのまま文字として扱われます）。" 
+                               Foreground="Gray" FontSize="11" Margin="0,0,0,5" TextWrapping="Wrap"/>
+                    <TextBox Name="txtNgKeywords" Height="70" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"/>
+                </StackPanel>
+            </TabItem>
+
+            <!-- 【実行条件】 -->
+            <TabItem Header="実行条件">
+                <StackPanel Margin="15">
+                    <TextBlock Text="定周期実行:" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <StackPanel Margin="15,0,0,15">
+                        <RadioButton Name="rbPeriodicOff" GroupName="PeriodicGrp" Content="定周期実行しない" Margin="0,0,0,5" Checked="Periodic_Changed" Unchecked="Periodic_Changed"/>
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton Name="rbPeriodicOn" GroupName="PeriodicGrp" Content="定周期で振り分けを実行する " VerticalAlignment="Center" Checked="Periodic_Changed" Unchecked="Periodic_Changed"/>
+                            <TextBox Name="txtPeriodicMinutes" Width="40" Height="25" VerticalContentAlignment="Center" Margin="5,0"/>
+                            <TextBlock Text="分毎" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Text="その他の設定:" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <StackPanel Margin="15,0,0,0">
+                        <CheckBox Name="chkMoveToRecycleBin" Content="ファイル削除時はごみ箱に移動する" Margin="0,0,0,8"/>
+                        <CheckBox Name="chkAutoCreateDest" Content="振り分け先フォルダが存在しない場合は自動で作成する" Margin="0,0,0,8"/>
+                        <CheckBox Name="chkStartMinimized" Content="最小化で起動する" Margin="0,0,0,8"/>
+                        <CheckBox Name="chkSilentReadOnly" Content="読み取り専用ファイルを振り分ける際に確認ダイアログを表示しない" Margin="0,0,0,8"/>
+                        
+                        <StackPanel Orientation="Horizontal">
+                            <CheckBox Name="chkLimitHistory" Content="振り分け履歴の保存件数を制限する " VerticalAlignment="Center" Checked="HistoryLimit_Changed" Unchecked="HistoryLimit_Changed"/>
+                            <TextBox Name="txtHistoryLimit" Width="40" Height="25" VerticalContentAlignment="Center" Margin="5,0"/>
+                            <TextBlock Text="百件" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </TabItem>
+
+            <TabItem Header="処理の優先度">
+                <StackPanel Margin="15">
+                    <TextBlock Text="ファイル振り分け処理の優先度:" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBlock Text="※優先度を低くすると、他のアプリケーションの動作が重くなりにくくなります。" Foreground="Gray" FontSize="11" Margin="0,0,0,15"/>
+                    
+                    <StackPanel Margin="15,0,0,0">
+                        <RadioButton Name="rbPriorityHigh" Content="高 (他のアプリより優先して最速で処理)" Margin="0,0,0,8"/>
+                        <RadioButton Name="rbPriorityNormal" Content="通常 (デフォルト)" Margin="0,0,0,8"/>
+                        <RadioButton Name="rbPriorityLow" Content="低 (他のアプリの邪魔をしない)" Margin="0,0,0,8"/>
+                        <RadioButton Name="rbPriorityIdle" Content="アイドル (PCが何もしていない時だけ処理)" Margin="0,0,0,8"/>
+                    </StackPanel>
+                </StackPanel>
+            </TabItem>
+
+            <!-- 【特殊】 -->
+            <TabItem Header="特殊">
+                <StackPanel Margin="15">
+                    <StackPanel Orientation="Horizontal" Margin="15,0,0,0">
+                        <TextBlock Text="ClassiNy CSVをインポート" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                        <Button Content="インポート" Width="100" Height="25" Click="BtnImportLegacy_Click"/>
+                    </StackPanel>
+                </StackPanel>
+            </TabItem>
+        </TabControl>
+
+        <!-- ボタン領域 -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="保存して閉じる" Width="120" Height="35" Margin="0,0,10,0" Background="#FF4CAF50" Foreground="White" FontWeight="Bold" Click="BtnSave_Click"/>
+            <Button Content="キャンセル" Width="90" Height="35" Click="BtnCancel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,79 @@
+<Window x:Class="Classify8.Views.PresetManagerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="プリセット管理" Height="350" Width="600"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <Grid Margin="10">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*"/>
+            <ColumnDefinition Width="3*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- 左側：リストと追加・削除ボタン -->
+        <Grid Grid.Column="0" Margin="0,0,15,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <ListView Name="lvPresets" Grid.Row="0" SelectionChanged="LvPresets_SelectionChanged">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="名称" DisplayMemberBinding="{Binding AliasName}" Width="100"/>
+                        <GridViewColumn Header="パス" DisplayMemberBinding="{Binding DirectoryPath}" Width="120"/>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+            
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0" HorizontalAlignment="Center">
+                <Button Name="btnAdd" Content="＋ 新規追加" Width="80" Height="25" Margin="0,0,10,0" Click="BtnAdd_Click"/>
+                <Button Name="btnDelete" Content="削除" Width="60" Height="25" Click="BtnDelete_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- 右側：編集エリア -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Text="エイリアス名称 (設定名):" FontWeight="Bold" Margin="0,0,0,5"/>
+            <TextBox Grid.Row="1" Name="txtAliasName" Height="25" Margin="0,0,0,15" TextChanged="Txt_TextChanged"/>
+
+            <TextBlock Grid.Row="2" Text="実フォルダパス:" FontWeight="Bold" Margin="0,0,0,5"/>
+            <Grid Grid.Row="3" Margin="0,0,0,15">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Name="txtDirectoryPath" Height="25" Margin="0,0,5,0" TextChanged="Txt_TextChanged">
+                    <TextBox.ToolTip>
+                        <ToolTip>
+                            <TextBlock>
+                                <Run FontWeight="Bold" Text="【パスに使える自動挿入タグ】"/><LineBreak/>
+                                <Run Text="/YYYY, /YY : 実行年 (4桁, 2桁)"/><LineBreak/>
+                                <Run Text="/MM : 実行月    /DD : 実行日"/><LineBreak/>
+                                <Run Text="/FYYYY, /FYY : ファイル更新年"/><LineBreak/>
+                                <Run Text="/FMM : ファイル更新月  /FDD : 更新日"/><LineBreak/>
+                                <Run Text="/NAME : 設定名 (振り分け条件名)"/><LineBreak/>
+                                <Run Text="/COND : 検索条件 (スラッシュは除外)"/><LineBreak/>
+                                <Run Foreground="Gray" Text="※大文字・小文字どちらでも使用可能"/>
+                            </TextBlock>
+                        </ToolTip>
+                    </TextBox.ToolTip>
+                </TextBox>
+                <Button Grid.Column="1" Content="参照..." Width="60" Height="25" Click="BtnBrowse_Click"/>
+            </Grid>
+            
+            <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Name="btnSave" Content="保存して閉じる" Width="100" Height="30" Margin="0,0,10,0" Background="#FF4CAF50" Foreground="White" FontWeight="Bold" Click="BtnSave_Click"/>
+                <Button Name="btnCancel" Content="キャンセル" Width="80" Height="30" Click="BtnCancel_Click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
