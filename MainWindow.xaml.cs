@@ -27,6 +27,15 @@ namespace Classify8
         private System.Windows.Forms.NotifyIcon _notifyIcon;
 
         private readonly System.Threading.SemaphoreSlim _saveLock = new System.Threading.SemaphoreSlim(1, 1);
+
+        private System.Drawing.Icon _normalIcon;
+        private System.Drawing.Icon _blankIcon;
+        private System.Windows.Threading.DispatcherTimer _blinkTimer;
+        private bool _isIconBlank = false;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+        private static extern bool DestroyIcon(IntPtr handle);
+
         public MainWindow()
         {
             InitializeComponent();
@@ -500,6 +509,12 @@ namespace Classify8
             _isSorting = true;
             var cts = new System.Threading.CancellationTokenSource();
 
+            if (_notifyIcon != null)
+            {
+                _notifyIcon.Text = "Classify8 - 自動振り分け実行中...";
+                _blinkTimer.Start();
+            }
+
             _progressWin = new ProgressWindow(cts) { Owner = this };
             this.IsEnabled = false;
 
@@ -718,6 +733,14 @@ namespace Classify8
                 {
                     _progressWin.CompleteAndClose();
                     _progressWin = null;
+                }
+
+                if (_notifyIcon != null)
+                {
+                    _blinkTimer.Stop();
+                    _isIconBlank = false;
+                    _notifyIcon.Icon = _normalIcon;
+                    _notifyIcon.Text = "Classify8 - 待機中";
                 }
 
                 this.IsEnabled = true;
@@ -1035,11 +1058,10 @@ namespace Classify8
         // ==========================================
         // タスクトレイ常駐とウィンドウ制御
         // ==========================================
-
         private void InitializeNotifyIcon()
         {
             _notifyIcon = new System.Windows.Forms.NotifyIcon();
-            _notifyIcon.Text = "Classify8 - 自動振り分け実行中";
+            _notifyIcon.Text = "Classify8 - 待機中";
 
             try
             {
@@ -1048,20 +1070,45 @@ namespace Classify8
                 {
                     if (stream != null)
                     {
-                        _notifyIcon.Icon = new System.Drawing.Icon(stream);
+                        _normalIcon = new System.Drawing.Icon(stream);
                     }
                 }
             }
             catch (Exception ex)
             {
                 Log($"[警告] タスクトレイアイコンの読み込みに失敗しました: {ex.Message}");
-                // 万が一読み込めなかった場合は、Windows標準の「i」マークを代わりに出す
-                _notifyIcon.Icon = System.Drawing.SystemIcons.Information;
+                _normalIcon = System.Drawing.SystemIcons.Information;
             }
+
+            _notifyIcon.Icon = _normalIcon;
             _notifyIcon.Visible = true;
+
+            // 🚨追加: 透明アイコン(点滅用)をメモリ上に生成
+            using (var bmp = new System.Drawing.Bitmap(16, 16))
+            {
+                IntPtr hIcon = bmp.GetHicon();
+                _blankIcon = System.Drawing.Icon.FromHandle(hIcon);
+            }
+
+            _blinkTimer = new System.Windows.Threading.DispatcherTimer();
+            _blinkTimer.Interval = TimeSpan.FromMilliseconds(500);
+            _blinkTimer.Tick += (s, e) =>
+            {
+                _isIconBlank = !_isIconBlank;
+                _notifyIcon.Icon = _isIconBlank ? _blankIcon : _normalIcon;
+            };
 
             // ダブルクリックで画面を復帰
             _notifyIcon.DoubleClick += (s, e) => ShowMainWindow();
+
+            // 左シングルクリックでも画面を復帰
+            _notifyIcon.MouseClick += (s, e) =>
+            {
+                if (e.Button == System.Windows.Forms.MouseButtons.Left)
+                {
+                    ShowMainWindow();
+                }
+            };
 
             // 右クリックメニューの作成
             var contextMenu = new System.Windows.Forms.ContextMenuStrip();
@@ -1073,7 +1120,7 @@ namespace Classify8
             contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
 
             var exitItem = new System.Windows.Forms.ToolStripMenuItem("終了(_X)");
-            exitItem.Click += (s, e) => MenuExit_Click(null, null); // 終了処理を呼ぶ
+            exitItem.Click += (s, e) => MenuExit_Click(null, null);
             contextMenu.Items.Add(exitItem);
 
             _notifyIcon.ContextMenuStrip = contextMenu;
@@ -1127,6 +1174,16 @@ namespace Classify8
             {
                 _notifyIcon.Visible = false;
                 _notifyIcon.Dispose();
+            }
+
+            if (_blankIcon != null)
+            {
+                DestroyIcon(_blankIcon.Handle);
+                _blankIcon.Dispose();
+            }
+            if (_normalIcon != null)
+            {
+                _normalIcon.Dispose();
             }
         }
 
