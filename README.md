@@ -1,4 +1,4 @@
-# Classify8 - 総合ドキュメント
+# Classify8 - Windows用ファイル自動振り分けツール
 
 ## 1. 機能概要
 
