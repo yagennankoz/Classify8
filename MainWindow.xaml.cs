@@ -72,23 +72,21 @@ namespace Classify8
             bool isSingleSelected = lvRules.SelectedItems.Count == 1;
             bool hasSelection = lvRules.SelectedItems.Count > 0;
 
-            // トップメニューの制御
             if (miCopy != null) miCopy.IsEnabled = isSingleSelected;
             if (miCut != null) miCut.IsEnabled = isSingleSelected;
+            if (miOpenSource != null) miOpenSource.IsEnabled = isSingleSelected;
             if (miOpenDest != null) miOpenDest.IsEnabled = isSingleSelected;
 
-            // コピーバッファが空ではない ＆ 1行選択されている時だけ「貼り付け」を有効化
             if (miPaste != null) miPaste.IsEnabled = isSingleSelected && _copyBuffer != null;
-
             if (miRunSelected != null) miRunSelected.IsEnabled = hasSelection;
 
-            // 右クリックメニューの制御
             if (ctxEdit != null) ctxEdit.IsEnabled = isSingleSelected;
             if (ctxDelete != null) ctxDelete.IsEnabled = hasSelection;
             if (ctxCopy != null) ctxCopy.IsEnabled = isSingleSelected;
             if (ctxCut != null) ctxCut.IsEnabled = isSingleSelected;
             if (ctxPaste != null) ctxPaste.IsEnabled = isSingleSelected && _copyBuffer != null;
             if (ctxRun != null) ctxRun.IsEnabled = hasSelection;
+            if (ctxOpenSource != null) ctxOpenSource.IsEnabled = isSingleSelected;
             if (ctxOpenDest != null) ctxOpenDest.IsEnabled = isSingleSelected;
         }
 
@@ -118,7 +116,19 @@ namespace Classify8
 
             if (window.ShowDialog() == true)
             {
-                RulesList.Add(new SortRuleViewModel(window.ResultRule, PresetList));
+                var newRuleVm = new SortRuleViewModel(window.ResultRule, PresetList);
+
+                if (lvRules.SelectedItem is SortRuleViewModel selectedItem)
+                {
+                    int index = RulesList.IndexOf(selectedItem);
+                    RulesList.Insert(index, newRuleVm);
+                }
+                else
+                {
+                    RulesList.Add(newRuleVm);
+                }
+
+                lvRules.SelectedItem = newRuleVm; // 追加した行を選択状態にする
                 SaveAllRules();
                 Log($"新しいルール「{window.ResultRule.RuleName}」を追加しました。");
             }
@@ -542,6 +552,13 @@ namespace Classify8
 
                             bool isSkip = false;
                             string srcPath = rule.SourceMode == "Preset" ? PresetList.FirstOrDefault(p => p.Id == rule.SourcePresetId)?.DirectoryPath : rule.SourceCustomPath;
+
+                            // (※ファイル特定前のため、ファイルタイムスタンプ系のタグは実行日時にフォールバックされます)
+                            if (!string.IsNullOrWhiteSpace(srcPath))
+                            {
+                                srcPath = DynamicPathBuilder.BuildPath(srcPath, "", rule);
+                            }
+
                             string destPath = rule.DestMode == "Preset" ? PresetList.FirstOrDefault(p => p.Id == rule.DestPresetId)?.DirectoryPath : rule.DestCustomPath;
 
                             if (string.IsNullOrWhiteSpace(srcPath) || string.IsNullOrWhiteSpace(destPath)) isSkip = true;
@@ -755,6 +772,7 @@ namespace Classify8
                 int index = RulesList.IndexOf(selected);
                 var newRule = _copyBuffer.Clone();
 
+                // 切り取りからのペーストか、コピーからのペーストかで名前を変える
                 if (!_isCutBuffer)
                 {
                     newRule.RuleName += " (コピー)";
@@ -762,11 +780,16 @@ namespace Classify8
                 else
                 {
                     // 一度切り取ったものを貼り付けた後は、通常コピーと同じ扱いにする
-                    // （※連続でペーストした時に同名ルールが複数できるのを防ぐため）
                     _isCutBuffer = false;
                 }
 
-                RulesList.Insert(index + 1, new SortRuleViewModel(newRule, PresetList));
+                var newRuleVm = new SortRuleViewModel(newRule, PresetList);
+
+                RulesList.Insert(index, newRuleVm);
+
+                // 貼り付けた行を自動で選択状態にする（連続ペーストをしやすくするため）
+                lvRules.SelectedItem = newRuleVm;
+
                 SaveAllRules();
                 Log("ルールを貼り付けました。");
             }
@@ -786,6 +809,18 @@ namespace Classify8
             SaveAllRules();
         }
 
+        private void MenuOpenSource_Click(object sender, RoutedEventArgs e)
+        {
+            if (lvRules.SelectedItem is SortRuleViewModel selected)
+            {
+                string path = selected.Rule.SourceMode == "Preset"
+                    ? PresetList.FirstOrDefault(p => p.Id == selected.Rule.SourcePresetId)?.DirectoryPath
+                    : selected.Rule.SourceCustomPath;
+
+                OpenFolderWithTags(path, selected.RuleName);
+            }
+        }
+
         private void MenuOpenDest_Click(object sender, RoutedEventArgs e)
         {
             if (lvRules.SelectedItem is SortRuleViewModel selected)
@@ -794,54 +829,65 @@ namespace Classify8
                     ? PresetList.FirstOrDefault(p => p.Id == selected.Rule.DestPresetId)?.DirectoryPath
                     : selected.Rule.DestCustomPath;
 
-                if (!string.IsNullOrWhiteSpace(path))
+                OpenFolderWithTags(path, selected.RuleName);
+            }
+        }
+
+        private void OpenFolderWithTags(string path, string ruleName)
+        {
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                // 1. 日付や条件タグなどの変動タグが出現した位置を探す
+                string[] stopTags = { "/YYYY", "/YY", "/MM", "/DD", "/FYYYY", "/FYY", "/FMM", "/FDD", "/COND" };
+                int firstTagIndex = -1;
+                foreach (var tag in stopTags)
                 {
-                    // 1. 変動タグ (日付等) が出現したら、その手前の親フォルダ階層 (最後の '\') までを切り出す
-                    string[] stopTags = { "/YYYY", "/YY", "/MM", "/DD", "/FYYYY", "/FYY", "/FMM", "/FDD", "/COND" };
-                    int firstTagIndex = -1;
-                    foreach (var tag in stopTags)
+                    int idx = path.IndexOf(tag, StringComparison.OrdinalIgnoreCase);
+                    if (idx >= 0 && (firstTagIndex == -1 || idx < firstTagIndex))
                     {
-                        int idx = path.IndexOf(tag, StringComparison.OrdinalIgnoreCase);
-                        if (idx >= 0 && (firstTagIndex == -1 || idx < firstTagIndex))
-                        {
-                            firstTagIndex = idx; // 一番最初に出現したタグの位置を記録
-                        }
+                        firstTagIndex = idx;
                     }
+                }
 
-                    if (firstTagIndex >= 0)
-                    {
-                        // 変動タグより前にある最後のディレクトリ区切り文字 '\' を探す
-                        int lastSlash = path.LastIndexOf('\\', firstTagIndex);
-                        if (lastSlash >= 0)
-                        {
-                            path = path.Substring(0, lastSlash + 1); // '\' を含めて切り出し
-                        }
-                        else
-                        {
-                            path = path.Substring(0, firstTagIndex);
-                        }
-                    }
+                // 2. 変動タグが見つかったら、そこより手前までをシンプルに切り出す
+                if (firstTagIndex >= 0)
+                {
+                    path = path.Substring(0, firstTagIndex);
+                }
 
-                    // 2. /NAME タグは実際のルール名に展開する (大文字小文字無視)
-                    path = System.Text.RegularExpressions.Regex.Replace(path, "(?i)/NAME", selected.RuleName ?? "");
+                // 3. /NAME タグを実際のルール名に展開する
+                string safeRuleName = ruleName ?? "";
+                // (万が一ルール名にWindowsパスとして使えない文字が含まれていたらアンダーバーに置換)
+                foreach (char c in System.IO.Path.GetInvalidFileNameChars())
+                {
+                    safeRuleName = safeRuleName.Replace(c.ToString(), "_");
+                }
 
-                    // 3. 展開後のフォルダを開く 
-                    // (※まだ振り分けが実行されておらずフォルダが未作成の場合を考慮し、存在する親階層まで遡る安全処理)
-                    while (!string.IsNullOrWhiteSpace(path) && !Directory.Exists(path))
-                    {
-                        var parent = Directory.GetParent(path);
-                        if (parent == null) break;
-                        path = parent.FullName;
-                    }
+                path = System.Text.RegularExpressions.Regex.Replace(path, "(?i)/NAME", safeRuleName);
 
-                    if (Directory.Exists(path))
-                    {
-                        Process.Start("explorer.exe", path);
-                    }
-                    else
-                    {
-                        MessageBox.Show($"フォルダが存在しません:\n{path}", "エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    }
+                // パス末尾の不要な空白やスラッシュを掃除する
+                path = path.TrimEnd(' ', '/');
+                if (path.Length > 3 && path.EndsWith("\\"))
+                {
+                    path = path.TrimEnd('\\');
+                }
+
+                // 4. フォルダが存在しない場合、存在する親ディレクトリが見つかるまで遡る
+                while (!string.IsNullOrWhiteSpace(path) && !Directory.Exists(path))
+                {
+                    var parent = Directory.GetParent(path);
+                    if (parent == null) break;
+                    path = parent.FullName;
+                }
+
+                // 5. 確定したフォルダを開く
+                if (Directory.Exists(path))
+                {
+                    Process.Start("explorer.exe", path);
+                }
+                else
+                {
+                    MessageBox.Show($"フォルダが存在しません:\n{path}", "エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
         }

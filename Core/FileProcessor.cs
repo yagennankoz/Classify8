@@ -48,14 +48,36 @@ namespace Classify8.Core
                         newFileName = Path.GetFileName(destPath);
                     }
 
-                    if (rule.IsMoveAction) await Task.Run(() => Directory.Move(sourcePath, destPath), ct);
-                    else CopyDirectory(sourcePath, destPath);
+                    if (rule.IsMoveAction)
+                    {
+                        string srcRoot = Path.GetPathRoot(Path.GetFullPath(sourcePath));
+                        string destRoot = Path.GetPathRoot(Path.GetFullPath(destPath));
+
+                        if (string.Equals(srcRoot, destRoot, StringComparison.OrdinalIgnoreCase))
+                        {
+                            // 同一ドライブならそのまま移動
+                            await Task.Run(() => Directory.Move(sourcePath, destPath), ct);
+                        }
+                        else
+                        {
+                            // 別ドライブなら、中身をコピーしてから元フォルダをごみ箱/完全削除へ送る
+                            await Task.Run(() =>
+                            {
+                                CopyDirectory(sourcePath, destPath);
+                                SafeDelete(sourcePath, true);
+                            }, ct);
+                        }
+                    }
+                    else
+                    {
+                        await Task.Run(() => CopyDirectory(sourcePath, destPath), ct);
+                    }
                 }
                 else
                 {
                     if (CheckIfAlreadyExists(sourcePath, destDir, itemName))
                     {
-                        if (rule.IsMoveAction) SafeDeleteFile(sourcePath);
+                        if (rule.IsMoveAction) SafeDelete(sourcePath);
                         return CreateHistory(rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (完全一致)");
                     }
 
@@ -73,19 +95,19 @@ namespace Classify8.Core
                         }
                         else if (resolution == ConflictResolution.KeepNewer)
                         {
-                            if (srcInfo.LastWriteTime > destInfo.LastWriteTime) SafeDeleteFile(destPath);
+                            if (srcInfo.LastWriteTime > destInfo.LastWriteTime) SafeDelete(destPath);
                             else
                             {
-                                if (rule.IsMoveAction) SafeDeleteFile(sourcePath);
+                                if (rule.IsMoveAction) SafeDelete(sourcePath);
                                 return CreateHistory(rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (より新しいファイル有)");
                             }
                         }
                         else if (resolution == ConflictResolution.KeepOlder)
                         {
-                            if (srcInfo.LastWriteTime < destInfo.LastWriteTime) SafeDeleteFile(destPath);
+                            if (srcInfo.LastWriteTime < destInfo.LastWriteTime) SafeDelete(destPath);
                             else
                             {
-                                if (rule.IsMoveAction) SafeDeleteFile(sourcePath);
+                                if (rule.IsMoveAction) SafeDelete(sourcePath);
                                 return CreateHistory(rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (より古いファイル有)");
                             }
                         }
@@ -119,11 +141,10 @@ namespace Classify8.Core
             DateTime srcTime = srcInfo.LastWriteTime;
 
             string baseName = GetBaseNameWithoutSerial(itemName, out string ext);
-            string searchPattern = $"{baseName}*{ext}"; // 連番部分をワイルドカードにして絞り込む
+            string searchPattern = $"{baseName}*{ext}";
 
             try
             {
-                // 絞り込んだ候補の中からさらに厳密に比較する
                 foreach (var filePath in Directory.EnumerateFiles(destDir, searchPattern))
                 {
                     string destName = Path.GetFileName(filePath);
@@ -131,8 +152,6 @@ namespace Classify8.Core
                     if (GetBaseNameWithoutSerial(destName, out _) == baseName)
                     {
                         var destInfo = new FileInfo(filePath);
-
-                        // サイズが完全に一致し、かつタイムスタンプの誤差が2秒以内なら同一とみなす(FAT形式考慮)
                         if (destInfo.Length == srcSize && Math.Abs((srcTime - destInfo.LastWriteTime).TotalSeconds) <= 2)
                         {
                             return true;
@@ -140,12 +159,11 @@ namespace Classify8.Core
                     }
                 }
             }
-            catch { } // 権限エラー等があれば無視
+            catch { }
 
             return false;
         }
 
-        // ファイル名末尾の連番 " (1)" や "(12)" を取り除いたベース名を返す
         private string GetBaseNameWithoutSerial(string fileName, out string ext)
         {
             string name = Path.GetFileNameWithoutExtension(fileName);
@@ -154,10 +172,6 @@ namespace Classify8.Core
             return match.Success ? match.Groups[1].Value : name;
         }
 
-
-        // ==========================================
-        // Windows API を使ったごみ箱機能の実装
-        // ==========================================
         private const int FO_DELETE = 0x0003;
         private const int FOF_ALLOWUNDO = 0x0040;
         private const int FOF_NOCONFIRMATION = 0x0010;
@@ -180,7 +194,7 @@ namespace Classify8.Core
         [DllImport("shell32.dll", CharSet = CharSet.Auto)]
         private static extern int SHFileOperation(ref SHFILEOPSTRUCT FileOp);
 
-        private void SafeDeleteFile(string path)
+        private void SafeDelete(string path, bool isDirectory = false)
         {
             try
             {
@@ -196,7 +210,8 @@ namespace Classify8.Core
                 }
                 else
                 {
-                    File.Delete(path);
+                    if (isDirectory && Directory.Exists(path)) Directory.Delete(path, true);
+                    else if (File.Exists(path)) File.Delete(path);
                 }
             }
             catch { }

@@ -11,9 +11,9 @@ namespace Classify8.Core
         public static List<SortRule> ImportFromClassyNyCsv(string filePath, IList<Preset> presets)
         {
             var rules = new List<SortRule>();
-            
+
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            var lines = File.ReadAllLines(filePath, Encoding.GetEncoding("Shift_JIS")); 
+            var lines = File.ReadAllLines(filePath, Encoding.GetEncoding("Shift_JIS"));
 
             for (int i = 3; i < lines.Length; i++)
             {
@@ -64,7 +64,7 @@ namespace Classify8.Core
                 rule.DestCustomPath = cols[8];
 
                 // 10) 振り分けorコピー
-                rule.IsMoveAction = cols[9] == "0"; 
+                rule.IsMoveAction = cols[9] == "0";
 
                 // 12, 13, 14) 揺れ吸収 
                 rule.IgnoreCase = cols[11] == "1";
@@ -100,14 +100,14 @@ namespace Classify8.Core
             var includes = new List<string>();
             var excludes = new List<string>();
 
-            // 🚨変更: スラッシュ(/)で始まるものを除外キーワードとして仕分け
+            // スラッシュ(/)で始まるものを除外キーワードとして仕分け
             foreach (var token in tokens)
             {
                 if (token.StartsWith("/") && token.Length > 1) excludes.Add(token.Substring(1));
                 else includes.Add(token);
             }
 
-            // 🚨変更: 括弧の最適化
+            // 括弧の最適化
             string incStr = "";
             if (includes.Count == 1)
             {
@@ -146,13 +146,13 @@ namespace Classify8.Core
 
         private static void ApplyLegacySizeCondition(SortRule rule, string enabledFlag, string sizeVal, string unitStr, string conditionType)
         {
-            if (enabledFlag != "1") return; 
+            if (enabledFlag != "1") return;
             if (!double.TryParse(sizeVal, out double val)) return;
-            
+
             if (!int.TryParse(unitStr, out int unitInt)) unitInt = 1;
             SizeUnit unit = (SizeUnit)unitInt;
 
-            if (conditionType == "1") 
+            if (conditionType == "1")
             {
                 rule.SizeMax_Enabled = true;
                 rule.SizeMax_Value = val;
