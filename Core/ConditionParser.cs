@@ -47,8 +47,13 @@ namespace Classify8.Core
                     case "/!": tokens.Add(new Token { Type = TokenType.Not }); break;
                     case "/(": tokens.Add(new Token { Type = TokenType.LParen }); break;
                     case "/)": tokens.Add(new Token { Type = TokenType.RParen }); break;
-                    default: 
-                        tokens.Add(new Token { Type = TokenType.Term, Value = part.Trim() }); 
+                    default:
+                        string val = part.Trim();
+                        if (val.StartsWith("\"") && val.EndsWith("\"") && val.Length >= 2)
+                        {
+                            val = val.Substring(1, val.Length - 2);
+                        }
+                        tokens.Add(new Token { Type = TokenType.Term, Value = val });
                         break;
                 }
             }
@@ -61,8 +66,8 @@ namespace Classify8.Core
                 {
                     var prev = tokens[i - 1].Type;
                     var curr = tokens[i].Type;
-                    
-                    bool needsAnd = 
+
+                    bool needsAnd =
                         (prev == TokenType.Term && curr == TokenType.Term) ||
                         (prev == TokenType.Term && curr == TokenType.Not) ||
                         (prev == TokenType.Term && curr == TokenType.LParen) ||

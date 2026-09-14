@@ -164,7 +164,7 @@ namespace Classify8
             }
             else
             {
-                MessageBox.Show("編集するルールを選択してください。", "お知らせ");
+                MessageBox.Show(this, "編集するルールを選択してください。", "お知らせ");
             }
         }
 
@@ -176,7 +176,7 @@ namespace Classify8
                     ? "選択したルールを本当に削除しますか？"
                     : $"{lvRules.SelectedItems.Count} 件のルールを本当に削除しますか？";
 
-                if (MessageBox.Show(msg, "確認", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                if (MessageBox.Show(this, msg, "確認", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
                 {
                     // 選択された複数行をリスト化してから一気に削除
                     var selectedItems = lvRules.SelectedItems.Cast<SortRuleViewModel>().ToList();
@@ -340,40 +340,32 @@ namespace Classify8
 
         private void LvRules_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            var rowItem = GetRowItemFromPoint(e.GetPosition(lvRules));
+            var rowItem = GetRowItemFromOriginalSource(e.OriginalSource as DependencyObject);
 
-            // =========================================================
-            // WFPのイベント吸収を無視する、ダブルクリック検知
-            // =========================================================
             if (e.ClickCount == 2 && rowItem != null)
             {
                 var targetRules = new List<SortRuleViewModel> { rowItem };
                 _ = ExecuteSortingAsync(targetRules);
 
-                e.Handled = true; // 他のイベントが暴発するのを防ぐ
-                return; // ドラッグ処理などには進まず、ここで終了
+                e.Handled = true; // ドラッグ操作などに進むのを防ぐ
+                return;
             }
-            // =========================================================
 
             if (rowItem != null)
             {
-                // クリックした行が「既に選択されている行」かチェック
                 if (lvRules.SelectedItems.Contains(rowItem))
                 {
-                    // CTRLキーやSHIFTキーが押されている時は「選択の解除/追加」を優先するため移動はしない
                     if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != ModifierKeys.None)
                     {
                         _dragStartPoint = null;
                     }
                     else
                     {
-                        // 選択済み行を純粋に左クリックした場合のみ、移動(DnD)の準備をする
                         _dragStartPoint = e.GetPosition(null);
                     }
                 }
                 else
                 {
-                    // 非選択行をクリックした時は、WPF標準の選択動作(ドラッグ複数選択など)に任せるため、移動準備はしない
                     _dragStartPoint = null;
                 }
             }
@@ -423,33 +415,27 @@ namespace Classify8
             {
                 if (_draggingItems == null || _draggingItems.Count == 0) return;
 
-                // ドロップされた位置の行を取得（何もない空白なら null になる）
                 var dropTarget = GetRowItemFromPoint(e.GetPosition(lvRules));
-                bool appendToEnd = (dropTarget == null); // 空白なら最後尾に追加フラグを立てる
+                bool appendToEnd = (dropTarget == null);
 
                 var itemsToMove = _draggingItems.OrderBy(x => RulesList.IndexOf(x)).ToList();
 
-                // ターゲット自身へのドロップは無効
                 if (!appendToEnd && itemsToMove.Contains(dropTarget)) return;
 
-                // 一旦リストから削除
                 foreach (var item in itemsToMove)
                 {
                     RulesList.Remove(item);
                 }
 
-                // 挿入位置を決定（最後尾に追加するか、ターゲット行の位置に挿入するか）
                 int insertIndex = appendToEnd ? RulesList.Count : RulesList.IndexOf(dropTarget);
                 if (insertIndex < 0) insertIndex = RulesList.Count;
 
-                // ターゲット位置へ順番に挿入
                 foreach (var item in itemsToMove)
                 {
                     RulesList.Insert(insertIndex, item);
-                    insertIndex++; // 複数行ある場合はインデックスをずらしながら挿入
+                    insertIndex++;
                 }
 
-                // 移動後の行を選択状態にする
                 lvRules.SelectedItems.Clear();
                 foreach (var item in itemsToMove)
                 {
@@ -460,7 +446,6 @@ namespace Classify8
             }
         }
 
-        // ListViewItem を取得するように変更
         private SortRuleViewModel GetRowItemFromPoint(Point point)
         {
             var hitTestResult = VisualTreeHelper.HitTest(lvRules, point);
@@ -474,7 +459,7 @@ namespace Classify8
 
             if (depObj is ListViewItem row)
             {
-                return row.Content as SortRuleViewModel; // Item ではなく Content
+                return row.Content as SortRuleViewModel;
             }
             return null;
         }
@@ -722,7 +707,7 @@ namespace Classify8
 
                     if (!isAutoExecution && totalErrorCount > 0)
                     {
-                        MessageBox.Show($"{totalErrorCount}件のエラーが発生しました。\n詳細は画面下のログを確認してください。",
+                        MessageBox.Show(this, $"{totalErrorCount}件のエラーが発生しました。\n詳細は画面下のログを確認してください。",
                                         "一部処理に失敗しました", MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                 }
@@ -910,32 +895,16 @@ namespace Classify8
                 }
                 else
                 {
-                    MessageBox.Show($"フォルダが存在しません:\n{path}", "エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(this, $"フォルダが存在しません:\n{path}", "エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
         }
 
 
-        // ダブルクリックで選択行の振り分けを実行
-        private void LvRules_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            var rowItem = GetRowItemFromPoint(e.GetPosition(lvRules));
-            // データ行以外（ヘッダー部分や空白）のダブルクリックを無視する
-            if (rowItem != null)
-            {
-                // 選択状態に依存せず、確実に「今ダブルクリックした対象」だけをリストに入れて実行する
-                var targetRules = new List<SortRuleViewModel> { rowItem };
-                _ = ExecuteSortingAsync(targetRules);
-
-                // 余計なイベント（文字のテキスト選択など）が暴発するのを防ぐ
-                e.Handled = true;
-            }
-        }
-
         // 右クリック時に、クリックされた行だけを「単一行選択」にする
         private void LvRules_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
-            var rowItem = GetRowItemFromPoint(e.GetPosition(lvRules));
+            var rowItem = GetRowItemFromOriginalSource(e.OriginalSource as DependencyObject);
             if (rowItem != null)
             {
                 lvRules.SelectedItems.Clear();
@@ -947,6 +916,23 @@ namespace Classify8
             }
         }
 
+        private SortRuleViewModel GetRowItemFromOriginalSource(DependencyObject depObj)
+        {
+            while (depObj != null && !(depObj is ListViewItem))
+            {
+                // スクロールバーやヘッダー行をクリックした場合は無視する
+                if (depObj is System.Windows.Controls.Primitives.ScrollBar) return null;
+                if (depObj is GridViewColumnHeader) return null;
+
+                depObj = VisualTreeHelper.GetParent(depObj);
+            }
+
+            if (depObj is ListViewItem row)
+            {
+                return row.Content as SortRuleViewModel;
+            }
+            return null;
+        }
 
         private void ApplyProcessPriority(ProcessPriorityClass priority)
         {
@@ -1211,7 +1197,7 @@ namespace Classify8
 
                 if (importedRules.Count == 0)
                 {
-                    MessageBox.Show("インポートできるルールが見つかりませんでした。\nファイル形式が正しいか確認してください。", "お知らせ", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(this, "インポートできるルールが見つかりませんでした。\nファイル形式が正しいか確認してください。", "お知らせ", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
@@ -1226,24 +1212,30 @@ namespace Classify8
                 lvRules.Items.Refresh(); // 画面を更新
 
                 Log($"[インポート] ClassyNyから {importedRules.Count} 件のルールをインポートしました。");
-                MessageBox.Show($"{importedRules.Count} 件のルールを正常にインポートしました！\n（※設定画面を閉じるとメイン画面に反映されます）", "インポート完了", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, $"{importedRules.Count} 件のルールを正常にインポートしました！\n（※設定画面を閉じるとメイン画面に反映されます）", "インポート完了", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"インポート中にエラーが発生しました。\n{ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, $"インポート中にエラーが発生しました。\n{ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        public void OpenRuleEditWindow(string ruleName)
+        public void OpenRuleEditWindow(string ruleId, string ruleName)
         {
-            var targetVm = RulesList.FirstOrDefault(r => r.RuleName == ruleName);
+            // まず一意のIdで探す
+            var targetVm = RulesList.FirstOrDefault(r => r.Rule.Id == ruleId);
+
+            // 見つからなければ(過去の履歴を開いた等)、名前でフォールバック検索する
+            if (targetVm == null)
+            {
+                targetVm = RulesList.FirstOrDefault(r => r.RuleName == ruleName);
+            }
+
             if (targetVm != null)
             {
-                // リスト上で選択状態にし、見える位置までスクロールする
                 lvRules.SelectedItem = targetVm;
                 lvRules.ScrollIntoView(targetVm);
 
-                // 編集画面を開く
                 var window = new RuleEditWindow(targetVm.Rule, PresetList) { Owner = this };
                 if (window.ShowDialog() == true)
                 {
@@ -1257,7 +1249,7 @@ namespace Classify8
             }
             else
             {
-                MessageBox.Show($"振り分け条件「{ruleName}」が見つかりません。\nすでに削除されたか、名称が変更された可能性があります。", "お知らせ", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"振り分け条件「{ruleName}」が見つかりません。\nすでに削除された可能性があります。", "お知らせ", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 

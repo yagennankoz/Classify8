@@ -4,7 +4,8 @@
         Title="振り分け履歴"
         Height="500"
         Width="1000"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
     <Grid Margin="10">
         <DataGrid Name="dgHistory"
                   AutoGenerateColumns="False"

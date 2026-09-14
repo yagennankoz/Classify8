@@ -15,7 +15,7 @@ namespace Classify8.Core
     {
         private static readonly string SettingsFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
         private static readonly string PresetsFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "presets.json");
-        
+
         private static readonly string RulesFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rules.csv");
 
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
@@ -63,11 +63,11 @@ namespace Classify8.Core
         // ==========================================
         // ルール (SortRules) の入出力 (CSV)
         // ==========================================
-        
+
         // CSVのヘッダー定義
         private static readonly string[] CsvHeaders = new[]
         {
-            "RuleName", "IsEnabled", "SearchCondition", 
+            "RuleName", "IsEnabled", "SearchCondition",
             "SourceMode", "SourcePresetId", "SourceCustomPath", "SearchSubDirectories",
             "DestMode", "DestPresetId", "DestCustomPath", "IsMoveAction",
             "IgnoreCase", "IgnoreWidth", "IgnoreKana", "DoNotSaveHistory", "TargetType",
@@ -75,7 +75,8 @@ namespace Classify8.Core
             "SizeMax_Enabled", "SizeMax_Value", "SizeMax_Unit",
             "DateBefore_Enabled", "DateBefore_Date", "DateAfter_Enabled", "DateAfter_Date",
             "TimeBefore_Enabled", "TimeBefore_Value", "TimeBefore_Unit",
-            "TimeAfter_Enabled", "TimeAfter_Value", "TimeAfter_Unit"
+            "TimeAfter_Enabled", "TimeAfter_Value", "TimeAfter_Unit",
+            "Id"
         };
 
         public static List<SortRule> LoadRules()
@@ -91,7 +92,7 @@ namespace Classify8.Core
                 for (int i = 1; i < lines.Count; i++) // 1行目(ヘッダー)をスキップ
                 {
                     var cols = lines[i];
-                    if (cols.Length < CsvHeaders.Length) continue;
+                    if (cols.Length < 32) continue;
 
                     var rule = new SortRule();
                     rule.RuleName = cols[0];
@@ -100,7 +101,7 @@ namespace Classify8.Core
                     rule.SourceMode = cols[3];
                     rule.SourcePresetId = cols[4];
                     rule.SourceCustomPath = cols[5];
-                    rule.SearchSubDirectories = bool.TryParse(cols[6], out bool b2) ? b2 : true;
+                    rule.SearchSubDirectories = bool.TryParse(cols[6], out bool b2) ? b2 : false;
                     rule.DestMode = cols[7];
                     rule.DestPresetId = cols[8];
                     rule.DestCustomPath = cols[9];
@@ -134,6 +135,15 @@ namespace Classify8.Core
                     rule.TimeAfter_Value = int.TryParse(cols[30], out int i2) ? i2 : 0;
                     rule.TimeAfter_Unit = Enum.TryParse(cols[31], out TimeUnit tu2) ? tu2 : TimeUnit.Day;
 
+                    if (cols.Length > 32 && !string.IsNullOrWhiteSpace(cols[32]))
+                    {
+                        rule.Id = cols[32];
+                    }
+                    else
+                    {
+                        rule.Id = Guid.NewGuid().ToString();
+                    }
+
                     rules.Add(rule);
                 }
             }
@@ -147,7 +157,7 @@ namespace Classify8.Core
             try
             {
                 var sb = new StringBuilder();
-                
+
                 // ヘッダー書き込み
                 sb.AppendLine(string.Join(",", CsvHeaders));
 
@@ -167,7 +177,7 @@ namespace Classify8.Core
                         EscapeCsv(rule.DestPresetId),
                         EscapeCsv(rule.DestCustomPath),
                         rule.IsMoveAction.ToString(),
-                        
+
                         rule.IgnoreCase.ToString(),
                         rule.IgnoreWidth.ToString(),
                         rule.IgnoreKana.ToString(),
@@ -193,7 +203,8 @@ namespace Classify8.Core
 
                         rule.TimeAfter_Enabled.ToString(),
                         rule.TimeAfter_Value.ToString(),
-                        rule.TimeAfter_Unit.ToString()
+                        rule.TimeAfter_Unit.ToString(),
+                        rule.Id
                     };
                     sb.AppendLine(string.Join(",", cols));
                 }

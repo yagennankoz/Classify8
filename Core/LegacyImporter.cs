@@ -20,21 +20,17 @@ namespace Classify8.Core
                 var line = lines[i];
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
-                var cols = line.Split(',');
+                var cols = ParseCsvLine(line);
+
                 if (cols.Length < 28) continue;
 
                 var rule = new SortRule();
 
-                // 1) チェック
                 rule.IsEnabled = cols[0] == "1";
-
-                // 2) 設定名 (空ならそのまま空にする)
                 rule.RuleName = cols[1];
 
-                // 3, 4) 元フォルダ
                 if (cols[2] == "0")
                 {
-                    // "ClassiNy共通振り分け元" プリセットを探す。なければ新規作成
                     var targetPreset = presets.FirstOrDefault(p => p.AliasName == "ClassiNy共通振り分け元");
                     if (targetPreset == null)
                     {
@@ -51,36 +47,23 @@ namespace Classify8.Core
                     rule.SourceCustomPath = cols[3];
                 }
 
-                // 5) サブフォルダ
                 rule.SearchSubDirectories = cols[4] == "1";
 
-                // 6, 7, 8) 検索キーワードの独自構文への変換
-                bool isIncludeOr = cols[5] == "1"; // 0:AND, 1:OR
-                bool isExcludeOr = cols[6] == "1"; // 0:AND, 1:OR
+                bool isIncludeOr = cols[5] == "1";
+                bool isExcludeOr = cols[6] == "1";
                 rule.SearchCondition = ConvertLegacyKeyword(cols[7], isIncludeOr, isExcludeOr);
 
-                // 9) 振り分け先フォルダ
                 rule.DestMode = "Custom";
                 rule.DestCustomPath = cols[8];
-
-                // 10) 振り分けorコピー
                 rule.IsMoveAction = cols[9] == "0";
 
-                // 12, 13, 14) 揺れ吸収 
                 rule.IgnoreCase = cols[11] == "1";
                 rule.IgnoreWidth = cols[12] == "1";
                 rule.IgnoreKana = cols[13] == "1";
-
-                // 16) 履歴保存
                 rule.DoNotSaveHistory = cols[15] == "1";
-
-                // 18) フォルダも対象 
                 rule.TargetType = cols[17] == "1" ? TargetType.Both : TargetType.FileOnly;
 
-                // 19~22) サイズ限定1
                 ApplyLegacySizeCondition(rule, cols[18], cols[19], cols[20], cols[21]);
-
-                // 23~26) サイズ限定2
                 ApplyLegacySizeCondition(rule, cols[22], cols[23], cols[24], cols[25]);
 
                 rules.Add(rule);
@@ -89,25 +72,71 @@ namespace Classify8.Core
             return rules;
         }
 
+        // ==========================================
+        // CSVのダブルクォートエスケープを正確に解除する
+        // ==========================================
+        private static string[] ParseCsvLine(string line)
+        {
+            var row = new List<string>();
+            bool inQuotes = false;
+            var token = new StringBuilder();
+
+            for (int i = 0; i < line.Length; i++)
+            {
+                char c = line[i];
+                if (c == '\"')
+                {
+                    // 連続するダブルクォート "" は、1つの " として扱う
+                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '\"')
+                    {
+                        token.Append('\"');
+                        i++;
+                    }
+                    else
+                    {
+                        inQuotes = !inQuotes; // クォートの開始・終了を切り替え
+                    }
+                }
+                else if (c == ',' && !inQuotes)
+                {
+                    // クォートの外側にあるカンマは区切り文字
+                    row.Add(token.ToString());
+                    token.Clear();
+                }
+                else
+                {
+                    // 通常の文字、またはクォートの中のカンマ
+                    token.Append(c);
+                }
+            }
+            row.Add(token.ToString());
+            return row.ToArray();
+        }
+
         // --- ヘルパーメソッド: キーワードの変換 ---
         private static string ConvertLegacyKeyword(string rawKeyword, bool isIncludeOr, bool isExcludeOr)
         {
             if (string.IsNullOrWhiteSpace(rawKeyword)) return "*";
 
-            // 全角スペースを半角スペースに変換して分割
-            var tokens = rawKeyword.Replace("　", " ").Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-
             var includes = new List<string>();
             var excludes = new List<string>();
 
-            // スラッシュ(/)で始まるものを除外キーワードとして仕分け
-            foreach (var token in tokens)
+            // ダブルクォートを考慮して分割 (マイナスやスラッシュが直前にある場合も1トークンとする)
+            var regex = new System.Text.RegularExpressions.Regex(@"[-/]?\""[^\""]*\""|[-/]?[^\s\""]+");
+            foreach (System.Text.RegularExpressions.Match match in regex.Matches(rawKeyword.Replace("　", " ")))
             {
-                if (token.StartsWith("/") && token.Length > 1) excludes.Add(token.Substring(1));
-                else includes.Add(token);
+                string token = match.Value;
+
+                if (token.StartsWith("-") || token.StartsWith("/"))
+                {
+                    excludes.Add(token.Substring(1));
+                }
+                else
+                {
+                    includes.Add(token);
+                }
             }
 
-            // 括弧の最適化
             string incStr = "";
             if (includes.Count == 1)
             {
@@ -117,7 +146,6 @@ namespace Classify8.Core
             {
                 string op = isIncludeOr ? " /| " : " /& ";
                 incStr = string.Join(op, includes);
-                // Excludesが存在し、かつIncludesがORの場合は括弧が必要
                 if (excludes.Count > 0 && isIncludeOr) incStr = "/( " + incStr + " /)";
             }
 
@@ -130,16 +158,15 @@ namespace Classify8.Core
             {
                 string op = isExcludeOr ? " /| " : " /& ";
                 excStr = string.Join(op, excludes.Select(x => "/! " + x));
-                // Includesが存在し、かつExcludesがORの場合は括弧が必要
                 if (includes.Count > 0 && isExcludeOr) excStr = "/( " + excStr + " /)";
             }
 
             if (includes.Count > 0 && excludes.Count > 0)
-                return incStr + " /& " + excStr;     // 両方ある場合はANDで繋ぐ
+                return incStr + " /& " + excStr;
             else if (includes.Count > 0)
-                return incStr;                       // 包含のみ
+                return incStr;
             else if (excludes.Count > 0)
-                return "* /& " + excStr;             // 除外のみ (すべて対象から除外)
+                return "* /& " + excStr;
             else
                 return "*";
         }

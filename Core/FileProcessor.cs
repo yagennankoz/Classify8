@@ -78,7 +78,7 @@ namespace Classify8.Core
                     if (CheckIfAlreadyExists(sourcePath, destDir, itemName))
                     {
                         if (rule.IsMoveAction) SafeDelete(sourcePath);
-                        return CreateHistory(rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (完全一致)");
+                        return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (完全一致)");
                     }
 
                     if (File.Exists(destPath))
@@ -91,7 +91,7 @@ namespace Classify8.Core
 
                         if (resolution == ConflictResolution.Skip)
                         {
-                            return CreateHistory(rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (同名あり)");
+                            return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (同名あり)");
                         }
                         else if (resolution == ConflictResolution.KeepNewer)
                         {
@@ -99,7 +99,7 @@ namespace Classify8.Core
                             else
                             {
                                 if (rule.IsMoveAction) SafeDelete(sourcePath);
-                                return CreateHistory(rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (より新しいファイル有)");
+                                return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (より新しいファイル有)");
                             }
                         }
                         else if (resolution == ConflictResolution.KeepOlder)
@@ -108,7 +108,7 @@ namespace Classify8.Core
                             else
                             {
                                 if (rule.IsMoveAction) SafeDelete(sourcePath);
-                                return CreateHistory(rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (より古いファイル有)");
+                                return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (より古いファイル有)");
                             }
                         }
                         else if (resolution == ConflictResolution.Rename)
@@ -129,7 +129,7 @@ namespace Classify8.Core
                 _logCallback($"[エラー] {itemName}: {ex.Message}");
             }
 
-            return CreateHistory(rule.RuleName, itemName, newFileName, sourcePath, destDir, status, errorMsg);
+            return CreateHistory(rule.Id, rule.RuleName, itemName, newFileName, sourcePath, destDir, status, errorMsg);
         }
 
         private bool CheckIfAlreadyExists(string sourcePath, string destDir, string itemName)
@@ -245,11 +245,12 @@ namespace Classify8.Core
             }
         }
 
-        private SortHistory CreateHistory(string ruleName, string name, string newName, string src, string dest, string status, string error = "")
+        private SortHistory CreateHistory(string ruleId, string ruleName, string name, string newName, string src, string dest, string status, string error = "")
         {
             return new SortHistory
             {
                 Timestamp = DateTime.Now,
+                RuleId = ruleId,
                 RuleName = ruleName,
                 FileName = name,
                 NewFileName = newName,
