@@ -1253,6 +1253,42 @@ namespace Classify8
             }
         }
 
+        // ==========================================
+        // 操作ヘルプ (Help.html を開く)
+        // ==========================================
+        private void MenuHelp_Click(object sender, RoutedEventArgs e)
+        {
+            // 実行ファイルと同じフォルダにある Help.md のパスを取得
+            string helpFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Help.html");
+
+            if (File.Exists(helpFilePath))
+            {
+                try
+                {
+                    // UseShellExecute を true にすることで、OSで関連付けられている標準アプリで開く
+                    Process.Start(new ProcessStartInfo(helpFilePath) { UseShellExecute = true });
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, $"ヘルプファイルの起動に失敗しました。\n{ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            else
+            {
+                MessageBox.Show(this, "ヘルプファイル (Help.html) が見つかりません。\nアプリケーションと同じフォルダに配置されているか確認してください。",
+                                "ファイルが見つかりません", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        // ==========================================
+        // ヘルプ / バージョン情報
+        // ==========================================
+        private void MenuAbout_Click(object sender, RoutedEventArgs e)
+        {
+            var window = new AboutWindow { Owner = this };
+            window.ShowDialog();
+        }
+
         private void Log(string message)
         {
             txtLog.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}\n");

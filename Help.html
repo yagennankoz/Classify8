@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Classify8 操作ヘルプ</title>
+    <style>
+        /* 全体のレイアウト設定 (左:固定幅, 右:可変幅でスクロール) */
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #333;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #fff;
+        }
+
+        /* サイドバー (左ペイン) */
+        .sidebar {
+            width: 260px;
+            background-color: #f8f9fa;
+            border-right: 1px solid #e1e4e8;
+            padding: 25px 0;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .sidebar h2 {
+            font-size: 14px;
+            text-transform: uppercase;
+            margin: 0 20px 10px;
+            color: #6a737d;
+            letter-spacing: 1px;
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 20px 0;
+        }
+
+        .sidebar li {
+            margin: 0;
+        }
+
+        .sidebar a {
+            display: block;
+            padding: 8px 20px;
+            color: #0366d6;
+            text-decoration: none;
+            font-size: 14px;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .sidebar a:hover {
+            background-color: #e1e4e8;
+            border-left: 3px solid #0366d6;
+            color: #000;
+        }
+
+        /* コンテンツ (右ペイン) */
+        .content {
+            flex: 1;
+            padding: 30px 50px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .content-inner {
+            max-width: 900px;
+            margin: 0 auto;
+            padding-bottom: 100px;
+        }
+
+        /* 見出し等のスタイル */
+        h1,
+        h2,
+        h3 {
+            color: #24292e;
+        }
+
+        h1 {
+            border-bottom: 2px solid #eaecef;
+            padding-bottom: 0.3em;
+            margin-top: 0;
+            font-size: 2em;
+            color: #1976D2;
+        }
+
+        h2 {
+            border-bottom: 1px solid #eaecef;
+            padding-bottom: 0.3em;
+            margin-top: 1.5em;
+            font-size: 1.5em;
+        }
+
+        h3 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+            margin-bottom: 0.5em;
+            color: #0366d6;
+        }
+
+        p,
+        li {
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        ul {
+            padding-left: 1.5em;
+        }
+
+        /* ジャンプした時のヘッダー被り防止 */
+        section {
+            scroll-margin-top: 30px;
+        }
+
+        /* テーブル (表) */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+
+        th,
+        td {
+            border: 1px solid #dfe2e5;
+            padding: 8px 13px;
+        }
+
+        th {
+            background-color: #f6f8fa;
+            text-align: left;
+        }
+
+        /* コードとキーボードキーの装飾 */
+        code {
+            background-color: #f3f4f6;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-family: SFMono-Regular, Consolas, monospace;
+            font-size: 90%;
+            color: #d32f2f;
+        }
+
+        kbd {
+            display: inline-block;
+            padding: 3px 5px;
+            font: 11px SFMono-Regular, Consolas, monospace;
+            line-height: 10px;
+            color: #444d56;
+            vertical-align: middle;
+            background-color: #fafbfc;
+            border: 1px solid #c6cbd1;
+            border-bottom-color: #959da5;
+            border-radius: 3px;
+            box-shadow: inset 0 -1px 0 #959da5;
+        }
+
+        /* FAQ用スタイル */
+        .faq-q {
+            font-weight: bold;
+            margin-top: 1.5em;
+            color: #1976D2;
+            font-size: 15px;
+        }
+
+        .faq-a {
+            margin-bottom: 1.5em;
+            padding-left: 1.5em;
+            border-left: 3px solid #1976D2;
+            font-size: 14px;
+        }
+
+        .box {
+            background-color: #f1f8ff;
+            border-left: 4px solid #1976D2;
+            padding: 10px 15px;
+            margin: 15px 0;
+            font-size: 13px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 左ペイン (目次) -->
+    <nav class="sidebar">
+        <h2>メニュー</h2>
+        <ul>
+            <li><a href="#overview">機能概要</a></li>
+            <li><a href="#main-window">メイン画面の操作</a></li>
+            <li><a href="#rule-edit">振り分け条件の編集</a></li>
+            <li><a href="#syntax">検索条件（独自構文）</a></li>
+            <li><a href="#tags">フォルダの自動生成（タグ）</a></li>
+            <li><a href="#presets">プリセット管理</a></li>
+            <li><a href="#history">振り分け履歴</a></li>
+            <li><a href="#settings">全体設定（オプション）</a></li>
+        </ul>
+    </nav>
+
+    <!-- 右ペイン (コンテンツ) -->
+    <main class="content">
+        <div class="content-inner">
+
+            <h1>Classify8 操作ヘルプ</h1>
+            <p>Classify8をご利用いただきありがとうございます。<br>このページでは、各画面の操作方法や、便利な検索タグの書き方について解説します。左のメニューをクリックすると、該当項目へジャンプします。</p>
+
+            <section id="overview">
+                <h2>機能概要</h2>
+                <p><strong>「Classify8」</strong> は、高度な条件指定と独自構文を用いて、ファイルやフォルダを自動的に「移動」または「コピー」する振り分けツールです。<br>
+                    タスクトレイ常駐によるバックグラウンド定周期実行や、同名ファイルが存在した場合の安全な同一チェック・競合解決機能を備えています。</p>
+                <div class="box">
+                    <strong>💡 異なるドライブ間のフォルダ移動について</strong><br>
+                    別ドライブ（CドライブからDドライブなど）へ「フォルダごと移動」する場合でも、ツールが自動的に「中身をコピーしてから元フォルダを削除」する安全な方式に切り替えて処理を行います。
+                </div>
+            </section>
+
+            <section id="main-window">
+                <h2>メイン画面の操作</h2>
+                <p>ダッシュボード（メイン画面）では、振り分け条件の一覧管理と実行を行います。</p>
+                <h3>リストの操作</h3>
+                <ul>
+                    <li><strong>複数選択</strong>: <kbd>Ctrl</kbd> や <kbd>Shift</kbd> を押しながらクリックで複数選択できます。</li>
+                    <li><strong>一括チェック切替</strong>: 複数行を選択した状態でいずれかのチェックボックスをクリックすると、選択中の全ルールの有効/無効が一瞬で切り替わります。</li>
+                    <li><strong>ドラッグ＆ドロップ</strong>: 選択したルールを掴んでドラッグすることで、順番を入れ替えられます。</li>
+                    <li><strong>右クリックメニュー</strong>:
+                        ルールの編集やコピーのほか、「振り分け元(先)フォルダを開く」ことが可能です（タグが含まれている場合は、展開可能な親フォルダを自動で開きます）。</li>
+                </ul>
+                <h3>キーボードショートカット</h3>
+                <ul>
+                    <li><kbd>Ctrl</kbd> + <kbd>C</kbd> : 選択したルールをコピーします。</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>X</kbd> : 選択したルールを切り取ります。</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>V</kbd> : コピー/切り取りしたルールを、<strong>現在選択している行の上</strong>に貼り付けます。</li>
+                    <li><kbd>Delete</kbd> : 選択したルールを一括で削除します。</li>
+                </ul>
+                <h3>実行操作</h3>
+                <ul>
+                    <li><strong>ダブルクリック</strong>: そのルール <strong>1件だけ</strong> を即座に振り分け実行します。</li>
+                    <li><strong>すべての条件で振り分け実行</strong>: 有効なルールをすべて実行します。手動実行時は進捗ダイアログが表示され、「キャンセル」による途中停止も可能です。</li>
+                </ul>
+            </section>
+
+            <section id="rule-edit">
+                <h2>振り分け条件の編集</h2>
+                <p>メイン画面で「＋ ルール追加」または「編集」を押すと設定画面が開きます。</p>
+                <h3>メイン項目</h3>
+                <ul>
+                    <li><strong>振り分け元 / 振り分け先</strong>: ファイルを探す場所と、移動(コピー)する場所を指定します。「プリセットを使用」にすると、よく使うフォルダを一元管理できます。
+                    </li>
+                    <li><strong>コピーモード</strong>: デフォルトは「移動（元ファイルが消える）」ですが、「コピーする」にチェックを入れると元ファイルを残したまま複製します。</li>
+                    <li><strong>検索条件</strong>: 抽出したいファイルの条件を記述します。（※構文の詳細は次項を参照）</li>
+                </ul>
+                <h3>オプションタブ</h3>
+                <ul>
+                    <li><strong>一般</strong>: 大文字/小文字や全半角の区別（揺れ吸収）の有無、対象をファイルのみにするかフォルダのみにするかを設定します。</li>
+                    <li><strong>ファイルサイズ限定</strong>: 指定したサイズ（Byte / KB / MB）の「以上」または「以下」のファイルを処理対象から除外できます。</li>
+                    <li><strong>タイムスタンプ限定</strong>: ファイルの更新日時をもとに、「特定の日付以降/以前」や、「7日以前」といった相対時間による除外設定が可能です。</li>
+                </ul>
+            </section>
+
+            <section id="syntax">
+                <h2>検索条件（独自構文）</h2>
+                <p>ファイルのファイル名・フォルダ名を判定するための構文です。</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>演算子</th>
+                            <th>意味</th>
+                            <th>入力例</th>
+                            <th>動作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>*</code> <code>?</code></td>
+                            <td>ワイルドカード</td>
+                            <td><code>*.pdf</code></td>
+                            <td>拡張子がPDFのファイルすべて</td>
+                        </tr>
+                        <tr>
+                            <td><strong><code>/&amp;</code></strong></td>
+                            <td>AND (かつ)</td>
+                            <td><code>画像 /&amp; 最新</code></td>
+                            <td>「画像」と「最新」の両方を含む</td>
+                        </tr>
+                        <tr>
+                            <td><strong><code>/|</code></strong></td>
+                            <td>OR (または)</td>
+                            <td><code>見積 /| 請求</code></td>
+                            <td>「見積」か「請求」のどちらかを含む</td>
+                        </tr>
+                        <tr>
+                            <td><strong><code>/!</code></strong></td>
+                            <td>NOT (含まない)</td>
+                            <td><code>*.txt /&amp; /! 破棄</code></td>
+                            <td>txtファイルだが「破棄」は含まない</td>
+                        </tr>
+                        <tr>
+                            <td><strong><code>/( )</code></strong></td>
+                            <td>グループ化</td>
+                            <td><code>/( A /| B /) /&amp; C</code></td>
+                            <td>「AかB」を含み、かつ「C」を含む</td>
+                        </tr>
+                        <tr>
+                            <td><strong><code>" "</code></strong></td>
+                            <td>空白を含む単語</td>
+                            <td><code>"MY DATA"</code></td>
+                            <td>「MY DATA」という1つの単語として検索</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p>※キーワードの間に演算子がない場合、自動的に <code> /&amp; </code> (AND) が補われます。</p>
+            </section>
+
+            <section id="tags">
+                <h2>フォルダの自動生成（動的タグ）</h2>
+                <p>振り分け元、または振り分け先のフォルダパスに以下のタグを入力すると、実行時の日時に合わせて自動的にフォルダが作られます。（大文字・小文字どちらでも可）</p>
+                <ul>
+                    <li><strong>/YYYY</strong> または <strong>/YY</strong> : 実行時の「年」（例: 2026, 26）</li>
+                    <li><strong>/MM</strong> : 実行時の「月」（例: 09）</li>
+                    <li><strong>/DD</strong> : 実行時の「日」（例: 15）</li>
+                    <li><strong>/NAME</strong> : 編集画面で入力した「設定名」</li>
+                    <li><strong>/COND</strong> : 「検索条件」の文字列（※パスに使えない <code>/</code> 記号は自動で削除されます）</li>
+                </ul>
+                <div class="box">
+                    <strong>▼ 振り分け先(出力先) でのみ使えるタグ</strong><br>
+                    実際のファイルの更新日時を読み取って分類するタグです。<br>
+                    <strong>/FYYYY</strong>(年), <strong>/FMM</strong>(月), <strong>/FDD</strong>(日) が使用可能です。
+                </div>
+            </section>
+
+            <section id="presets">
+                <h2>プリセット管理</h2>
+                <p>よく使うフォルダパスを「メイン画像フォルダ」などの名前（エイリアス）で登録しておくことができます。登録したプリセットの中身を変更すると、それを使用しているすべてのルールに即座に反映されます。</p>
+                <p>※使用中のプリセットを削除しようとした場合、「個別パス指定に変換してルールを維持する」か「強制的に削除する」かを選択できるフェールセーフ機能が働きます。</p>
+            </section>
+
+            <section id="history">
+                <h2>振り分け履歴</h2>
+                <p>メニューの <code>[振り分け] &gt; [振り分け履歴]</code> から、過去の実行結果を一覧確認できます。<br>
+                    履歴の行を<strong>右クリック</strong>することで、以下の操作が可能です。</p>
+                <ul>
+                    <li><strong>振り分け元 / 先フォルダを開く</strong>: エクスプローラーが開き、対象のファイルが自動的に選択・ハイライトされた状態で表示されます。</li>
+                    <li><strong>振り分けルールを開く</strong>: 対象ルールの編集画面に直接ジャンプします。</li>
+                </ul>
+            </section>
+
+            <section id="settings">
+                <h2>全体設定（オプション）</h2>
+                <p>メニューの <code>[設定] &gt; [オプション]</code> から、アプリ全体の挙動を変更できます。</p>
+                <h3>同名ファイルの処理</h3>
+                <p>振り分け先に既に同名ファイルが存在した場合の動作を、「サイズが同じ場合」と「違う場合」で決定します。（※名前が <code>(1)</code>
+                    などの連番違いであっても、サイズとタイムスタンプ誤差2秒以内であれば「完全に同一のファイル」と見なして高速でスキップ/お掃除する安全機能を備えています）</p>
+
+                <h3>振り分けないファイル (グローバルNG)</h3>
+                <p>アプリ全体で無視したいファイル（システムファイル等）を改行区切りで指定できます。自動的にOR条件として扱われ、ワイルドカードも使用可能です。</p>
+
+                <h3>実行条件</h3>
+                <p>定周期実行をONにすると、アプリがタスクトレイに最小化されている間、指定した分間隔で自動的にバックグラウンド振り分けが行われます。</p>
+            </section>
+        </div>
+    </main>
+
+</body>
+
+</html>

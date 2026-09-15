@@ -1,0 +1,50 @@
+<Window x:Class="Classify8.Views.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="バージョン情報"
+        Height="250"
+        Width="400"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Classify8"
+                FontSize="24"
+                FontWeight="Bold"
+                HorizontalAlignment="Center"/>
+        <TextBlock Name="txtVersion"
+                Text="バージョン: 1.0.0"
+                HorizontalAlignment="Center"
+                Grid.Row="1"
+                Margin="0,5,0,15"
+                Foreground="Gray"/>
+
+        <StackPanel Grid.Row="2">
+            <TextBlock Text="ファイルやフォルダを自動的に整理・振り分けするツールです。"
+                    TextWrapping="Wrap"
+                    Margin="0,0,0,15"/>
+
+            <TextBlock>
+                <Run Text="GitHub: "/>
+                <Hyperlink NavigateUri="https://github.com/yagennankoz/Classify8"
+                        RequestNavigate="Hyperlink_RequestNavigate">
+                    https://github.com/yagennankoz/Classify8
+                </Hyperlink>
+            </TextBlock>
+        </StackPanel>
+
+        <Button Grid.Row="3"
+                Content="OK"
+                Width="80"
+                Height="30"
+                HorizontalAlignment="Right"
+                Click="BtnOk_Click"/>
+    </Grid>
+</Window>
