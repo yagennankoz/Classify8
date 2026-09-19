@@ -40,6 +40,27 @@ namespace Classify8.Core
 
             try
             {
+                // 絶対パスに変換し、末尾の不要なスラッシュを除去して大文字小文字を無視して比較
+                string fullSource = Path.GetFullPath(sourcePath).TrimEnd('\\', '/');
+                string fullDest = Path.GetFullPath(destPath).TrimEnd('\\', '/');
+                if (string.Equals(fullSource, fullDest, StringComparison.OrdinalIgnoreCase))
+                {
+                    return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "警告 (同一パス指定)");
+                }
+            }
+            catch
+            {
+                // MTP(スマホ等)や仮想ドライブで GetFullPath が使えずエラーになる場合のフォールバック比較
+                string sSource = sourcePath.Replace("/", "\\").TrimEnd('\\');
+                string sDest = destPath.Replace("/", "\\").TrimEnd('\\');
+                if (string.Equals(sSource, sDest, StringComparison.OrdinalIgnoreCase))
+                {
+                    return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "警告 (同一パス指定)");
+                }
+            }
+
+            try
+            {
                 if (isDirectory)
                 {
                     if (Directory.Exists(destPath))
@@ -77,8 +98,16 @@ namespace Classify8.Core
                 {
                     if (CheckIfAlreadyExists(sourcePath, destDir, itemName))
                     {
-                        if (rule.IsMoveAction) SafeDelete(sourcePath);
-                        return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (完全一致)");
+                        if (rule.IsMoveAction)
+                        {
+                            SafeDelete(sourcePath);
+                            // 🚨変更: 移動モードで削除した場合はステータスを「削除」にする
+                            return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "削除 (完全一致)");
+                        }
+                        else
+                        {
+                            return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (完全一致)");
+                        }
                     }
 
                     if (File.Exists(destPath))
@@ -98,8 +127,12 @@ namespace Classify8.Core
                             if (srcInfo.LastWriteTime > destInfo.LastWriteTime) SafeDelete(destPath);
                             else
                             {
-                                if (rule.IsMoveAction) SafeDelete(sourcePath);
-                                return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (より新しいファイル有)");
+                                if (rule.IsMoveAction)
+                                {
+                                    SafeDelete(sourcePath);
+                                    return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "削除 (新しいファイル有)");
+                                }
+                                return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (新しいファイル有)");
                             }
                         }
                         else if (resolution == ConflictResolution.KeepOlder)
@@ -107,8 +140,12 @@ namespace Classify8.Core
                             if (srcInfo.LastWriteTime < destInfo.LastWriteTime) SafeDelete(destPath);
                             else
                             {
-                                if (rule.IsMoveAction) SafeDelete(sourcePath);
-                                return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (より古いファイル有)");
+                                if (rule.IsMoveAction)
+                                {
+                                    SafeDelete(sourcePath);
+                                    return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "削除 (古いファイル有)");
+                                }
+                                return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (古いファイル有)");
                             }
                         }
                         else if (resolution == ConflictResolution.Rename)

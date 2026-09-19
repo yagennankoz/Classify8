@@ -518,6 +518,10 @@ namespace Classify8
 
                 int totalProcessedCount = 0;
                 int totalErrorCount = 0;
+                int totalMovedCount = 0;
+                int totalCopiedCount = 0;
+                int totalDeletedCount = 0;
+
                 int totalRules = targetRules.Count;
                 int currentRuleIndex = 0;
 
@@ -631,15 +635,26 @@ namespace Classify8
                                 var history = await processor.ProcessItemAsync(itemPath, destPath, rule, ct);
                                 if (history == null) return;
 
-                                if (history.Status == "移動" || history.Status == "コピー")
+                                if (history.Status == "移動")
                                 {
-                                    lock (affectedDestDirs)
-                                    {
-                                        affectedDestDirs.Add(history.DestDir);
-                                    }
+                                    Interlocked.Increment(ref totalMovedCount);
+                                    lock (affectedDestDirs) { affectedDestDirs.Add(history.DestDir); }
+                                }
+                                else if (history.Status == "コピー")
+                                {
+                                    Interlocked.Increment(ref totalCopiedCount);
+                                    lock (affectedDestDirs) { affectedDestDirs.Add(history.DestDir); }
+                                }
+                                else if (history.Status.StartsWith("削除"))
+                                {
+                                    Interlocked.Increment(ref totalDeletedCount);
+                                }
+                                else if (history.Status == "エラー")
+                                {
+                                    Interlocked.Increment(ref totalErrorCount);
                                 }
 
-                                if (history.Status == "エラー") Interlocked.Increment(ref totalErrorCount);
+                                // スキップされたものは履歴に残さない（「削除」は保存される）
                                 if (!rule.DoNotSaveHistory && !history.Status.StartsWith("スキップ"))
                                 {
                                     historyRecords.Add(history);
@@ -702,7 +717,9 @@ namespace Classify8
 
                 if (!cts.IsCancellationRequested)
                 {
-                    string endMessage = totalErrorCount > 0 ? $"[終了] 処理完了（{totalErrorCount}件のエラーあり）" : "[終了] すべての処理が正常に完了しました。";
+                    string endMessage = totalErrorCount > 0
+                        ? $"[終了] 処理完了（移動: {totalMovedCount}件, コピー: {totalCopiedCount}件, 削除: {totalDeletedCount}件, エラー: {totalErrorCount}件）"
+                        : $"[終了] すべての処理が正常に完了しました。（移動: {totalMovedCount}件, コピー: {totalCopiedCount}件, 削除: {totalDeletedCount}件）";
                     Log(endMessage);
 
                     if (!isAutoExecution && totalErrorCount > 0)
