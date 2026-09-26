@@ -13,15 +13,26 @@ namespace Classify8.Core
     public class TermNode : IConditionNode
     {
         private readonly Regex _regex;
+
         public TermNode(string term, bool ignoreCase)
         {
-            // ワイルドカード(*, ?)を正規表現に変換
-            string pattern = "^.*" + Regex.Escape(term).Replace("\\*", ".*").Replace("\\?", ".") + ".*$";
+            if (term == "*")
+            {
+                _regex = null;
+                return;
+            }
+
+            string pattern = Regex.Escape(term).Replace("\\*", ".*").Replace("\\?", ".");
             var options = RegexOptions.Compiled;
             if (ignoreCase) options |= RegexOptions.IgnoreCase;
             _regex = new Regex(pattern, options);
         }
-        public bool Evaluate(string targetText) => _regex.IsMatch(targetText);
+
+        public bool Evaluate(string targetText)
+        {
+            if (_regex == null) return true;
+            return _regex.IsMatch(targetText);
+        }
     }
 
     public class AndNode : IConditionNode

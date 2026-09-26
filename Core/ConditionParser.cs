@@ -53,7 +53,10 @@ namespace Classify8.Core
                         {
                             val = val.Substring(1, val.Length - 2);
                         }
-                        tokens.Add(new Token { Type = TokenType.Term, Value = val });
+                        if (!string.IsNullOrEmpty(val))
+                        {
+                            tokens.Add(new Token { Type = TokenType.Term, Value = val });
+                        }
                         break;
                 }
             }

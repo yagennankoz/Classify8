@@ -546,11 +546,22 @@ namespace Classify8
                         foreach (var ruleVm in targetRules)
                         {
                             cts.Token.ThrowIfCancellationRequested();
-
                             currentRuleIndex++;
 
                             if (!ruleVm.IsEnabled) continue;
                             var rule = ruleVm.Rule;
+
+                            // マルチスレッドで衝突しないように、ループに入る前に1回だけ構文を解析しておく
+                            try
+                            {
+                                rule.CompileCondition();
+                            }
+                            catch (Exception ex)
+                            {
+                                Dispatcher.Invoke(() => Log($"[エラー] 検索条件の構文エラー (ルール「{rule.RuleName}」): {ex.Message}"));
+                                Interlocked.Increment(ref totalErrorCount);
+                                continue; // 構文が壊れている場合は安全にこのルールをスキップ
+                            }
 
                             string displayRuleName = $"[{currentRuleIndex} / {totalRules} 件目]  {rule.RuleName}";
 
@@ -583,7 +594,7 @@ namespace Classify8
 
                             // キャッシュのキーを作成
                             string cacheKey = $"{srcPath}|{rule.TargetType}|{rule.SearchSubDirectories}";
-                            List<string> itemsToProcess;
+                            List<string> itemsToProcess = new List<string>();
 
                             if (folderScanCache.ContainsKey(cacheKey))
                             {
@@ -596,19 +607,8 @@ namespace Classify8
                                     _progressWin.UpdateState(displayRuleName, "フォルダ内をスキャン中...", totalProcessedCount, totalErrorCount);
                                 }
 
-                                var enumOptions = new EnumerationOptions
-                                {
-                                    RecurseSubdirectories = rule.SearchSubDirectories,
-                                    IgnoreInaccessible = true
-                                };
-
-                                itemsToProcess = new List<string>();
-
-                                if (rule.TargetType == TargetType.FileOnly || rule.TargetType == TargetType.Both)
-                                    itemsToProcess.AddRange(Directory.EnumerateFiles(srcPath, "*", enumOptions));
-
-                                if (rule.TargetType == TargetType.DirectoryOnly || rule.TargetType == TargetType.Both)
-                                    itemsToProcess.AddRange(Directory.EnumerateDirectories(srcPath, "*", enumOptions));
+                                // エラーが起きても絶対に止まらない独自スキャナーを使用する
+                                itemsToProcess = SafeGetItemsToProcess(srcPath, rule.SearchSubDirectories, rule.TargetType);
 
                                 folderScanCache[cacheKey] = itemsToProcess;
                             }
@@ -623,48 +623,55 @@ namespace Classify8
 
                             await Parallel.ForEachAsync(itemsToProcess, parallelOptions, async (itemPath, ct) =>
                             {
-                                if (!File.Exists(itemPath) && !Directory.Exists(itemPath)) return;
-
-                                string itemName = Path.GetFileName(itemPath);
-
-                                if (ngConditionNode != null && ngConditionNode.Evaluate(itemName)) return;
-
-                                bool isDir = (File.GetAttributes(itemPath) & FileAttributes.Directory) == FileAttributes.Directory;
-                                if (!rule.IsMatch(itemPath, isDir)) return;
-
-                                var history = await processor.ProcessItemAsync(itemPath, destPath, rule, ct);
-                                if (history == null) return;
-
-                                if (history.Status == "移動")
+                                try
                                 {
-                                    Interlocked.Increment(ref totalMovedCount);
-                                    lock (affectedDestDirs) { affectedDestDirs.Add(history.DestDir); }
+                                    if (!File.Exists(itemPath) && !Directory.Exists(itemPath)) return;
+
+                                    string itemName = Path.GetFileName(itemPath);
+
+                                    if (ngConditionNode != null && ngConditionNode.Evaluate(itemName)) return;
+
+                                    bool isDir = (File.GetAttributes(itemPath) & FileAttributes.Directory) == FileAttributes.Directory;
+                                    if (!rule.IsMatch(itemPath, isDir)) return;
+
+                                    var history = await processor.ProcessItemAsync(itemPath, destPath, rule, ct);
+                                    if (history == null) return;
+
+                                    if (history.Status == "移動")
+                                    {
+                                        Interlocked.Increment(ref totalMovedCount);
+                                        lock (affectedDestDirs) { affectedDestDirs.Add(history.DestDir); }
+                                    }
+                                    else if (history.Status == "コピー")
+                                    {
+                                        Interlocked.Increment(ref totalCopiedCount);
+                                        lock (affectedDestDirs) { affectedDestDirs.Add(history.DestDir); }
+                                    }
+                                    else if (history.Status.StartsWith("削除"))
+                                    {
+                                        Interlocked.Increment(ref totalDeletedCount);
+                                    }
+                                    else if (history.Status == "エラー")
+                                    {
+                                        Interlocked.Increment(ref totalErrorCount);
+                                    }
+
+                                    // スキップされたものは履歴に残さない（「削除」は保存される）
+                                    if (!rule.DoNotSaveHistory && !history.Status.StartsWith("スキップ"))
+                                    {
+                                        historyRecords.Add(history);
+                                    }
+
+                                    int currentCount = Interlocked.Increment(ref totalProcessedCount);
+
+                                    if (_progressWin != null && currentCount % 50 == 0)
+                                    {
+                                        _progressWin.UpdateState(displayRuleName, itemName, currentCount, totalErrorCount);
+                                    }
                                 }
-                                else if (history.Status == "コピー")
-                                {
-                                    Interlocked.Increment(ref totalCopiedCount);
-                                    lock (affectedDestDirs) { affectedDestDirs.Add(history.DestDir); }
-                                }
-                                else if (history.Status.StartsWith("削除"))
-                                {
-                                    Interlocked.Increment(ref totalDeletedCount);
-                                }
-                                else if (history.Status == "エラー")
+                                catch
                                 {
                                     Interlocked.Increment(ref totalErrorCount);
-                                }
-
-                                // スキップされたものは履歴に残さない（「削除」は保存される）
-                                if (!rule.DoNotSaveHistory && !history.Status.StartsWith("スキップ"))
-                                {
-                                    historyRecords.Add(history);
-                                }
-
-                                int currentCount = Interlocked.Increment(ref totalProcessedCount);
-
-                                if (_progressWin != null && currentCount % 3 == 0)
-                                {
-                                    _progressWin.UpdateState(displayRuleName, itemName, currentCount, totalErrorCount);
                                 }
                             });
 
@@ -708,6 +715,10 @@ namespace Classify8
                     {
                         Dispatcher.Invoke(() => Log("[中止] ユーザーによって処理がキャンセルされました。"));
                     }
+                    catch (Exception ex)
+                    {
+                        Dispatcher.Invoke(() => Log($"[致命的エラー] 処理が中断されました: {ex.Message}"));
+                    }
                 });
 
                 progressBar.Value = 100;
@@ -749,6 +760,43 @@ namespace Classify8
                 lvRules.Items.Refresh();
                 _isSorting = false;
             }
+        }
+
+        private List<string> SafeGetItemsToProcess(string rootPath, bool recurse, TargetType targetType)
+        {
+            var items = new List<string>();
+            var queue = new Queue<string>();
+            queue.Enqueue(rootPath);
+
+            while (queue.Count > 0)
+            {
+                string current = queue.Dequeue();
+                try
+                {
+                    if (targetType == TargetType.FileOnly || targetType == TargetType.Both)
+                    {
+                        items.AddRange(Directory.GetFiles(current));
+                    }
+
+                    var dirs = Directory.GetDirectories(current);
+
+                    if (targetType == TargetType.DirectoryOnly || targetType == TargetType.Both)
+                    {
+                        items.AddRange(dirs);
+                    }
+
+                    if (recurse)
+                    {
+                        // サブフォルダがある場合はキューに追加して後で検索する
+                        foreach (var d in dirs) queue.Enqueue(d);
+                    }
+                }
+                catch
+                {
+                    // アクセス拒否やパス長超過などのエラーが出たフォルダは単にスキップして処理を継続する
+                }
+            }
+            return items;
         }
 
         // ==========================================
