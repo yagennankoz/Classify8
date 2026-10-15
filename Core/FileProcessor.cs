@@ -14,6 +14,9 @@ namespace Classify8.Core
         private readonly AppSettings _settings;
         private readonly Action<string> _logCallback;
 
+        // 内容比較は I/O 負荷が高いため、並列処理中でも同時に走る数を絞る (HDD/NAS での逆効果を防ぐ)
+        private static readonly SemaphoreSlim ContentCompareGate = new SemaphoreSlim(2, 2);
+
         public FileProcessor(AppSettings settings, Action<string> logCallback)
         {
             _settings = settings;
@@ -96,17 +99,28 @@ namespace Classify8.Core
                 }
                 else
                 {
-                    if (CheckIfAlreadyExists(sourcePath, destDir, itemName))
+                    string matchKind;
+                    try
+                    {
+                        matchKind = CheckIfAlreadyExists(sourcePath, destDir, itemName, ct);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // 内容比較の途中でキャンセルされた場合は、何も処理せず中断扱いにする
+                        return null;
+                    }
+
+                    if (matchKind != null)
                     {
                         if (rule.IsMoveAction)
                         {
                             SafeDelete(sourcePath);
                             // 🚨変更: 移動モードで削除した場合はステータスを「削除」にする
-                            return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "削除 (完全一致)");
+                            return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, $"削除 ({matchKind})");
                         }
                         else
                         {
-                            return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, "スキップ (完全一致)");
+                            return CreateHistory(rule.Id, rule.RuleName, itemName, "", sourcePath, destDir, $"スキップ ({matchKind})");
                         }
                     }
 
@@ -169,9 +183,13 @@ namespace Classify8.Core
             return CreateHistory(rule.Id, rule.RuleName, itemName, newFileName, sourcePath, destDir, status, errorMsg);
         }
 
-        private bool CheckIfAlreadyExists(string sourcePath, string destDir, string itemName)
+        /// <summary>
+        /// 振り分け先に同一ファイルが既にあるか調べる。
+        /// 戻り値: "完全一致"(サイズ・更新日時が一致) / "内容一致"(サイズ同一・更新日時違い・中身が同一) / null(重複なし)
+        /// </summary>
+        private string CheckIfAlreadyExists(string sourcePath, string destDir, string itemName, CancellationToken ct)
         {
-            if (!Directory.Exists(destDir)) return false;
+            if (!Directory.Exists(destDir)) return null;
 
             var srcInfo = new FileInfo(sourcePath);
             long srcSize = srcInfo.Length;
@@ -179,6 +197,9 @@ namespace Classify8.Core
 
             string baseName = GetBaseNameWithoutSerial(itemName, out string ext);
             string searchPattern = $"{baseName}*{ext}";
+
+            // サイズは同じだが更新日時が異なる候補 (内容比較の対象)
+            List<string> sameSizeCandidates = null;
 
             try
             {
@@ -189,16 +210,56 @@ namespace Classify8.Core
                     if (GetBaseNameWithoutSerial(destName, out _) == baseName)
                     {
                         var destInfo = new FileInfo(filePath);
-                        if (destInfo.Length == srcSize && Math.Abs((srcTime - destInfo.LastWriteTime).TotalSeconds) <= 2)
+                        if (destInfo.Length != srcSize) continue;
+
+                        // 従来判定: サイズ一致 + 更新日時が2秒以内 → I/O なしで即決
+                        if (Math.Abs((srcTime - destInfo.LastWriteTime).TotalSeconds) <= 2)
                         {
-                            return true;
+                            return "完全一致";
+                        }
+
+                        if (_settings.CompareContentWhenTimestampDiffers)
+                        {
+                            sameSizeCandidates ??= new List<string>();
+
+                            // 同名ファイルは最も一致しやすいので先頭に置く
+                            if (string.Equals(destName, itemName, StringComparison.OrdinalIgnoreCase))
+                                sameSizeCandidates.Insert(0, filePath);
+                            else
+                                sameSizeCandidates.Add(filePath);
                         }
                     }
                 }
             }
             catch { }
 
-            return false;
+            // 更新日時の一致候補が無かった場合のみ、内容比較に進む (ここで初めてファイルの中身を読む)
+            if (sameSizeCandidates != null && sameSizeCandidates.Count > 0 && IsWithinCompareLimit(srcSize))
+            {
+                foreach (var candidate in sameSizeCandidates)
+                {
+                    ContentCompareGate.Wait(ct);
+                    try
+                    {
+                        if (FileContentComparer.AreContentsEqual(sourcePath, candidate, ct))
+                        {
+                            return "内容一致";
+                        }
+                    }
+                    finally
+                    {
+                        ContentCompareGate.Release();
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private bool IsWithinCompareLimit(long size)
+        {
+            if (_settings.ContentCompareMaxSizeMB <= 0) return true;
+            return size <= (long)_settings.ContentCompareMaxSizeMB * 1024 * 1024;
         }
 
         private string GetBaseNameWithoutSerial(string fileName, out string ext)

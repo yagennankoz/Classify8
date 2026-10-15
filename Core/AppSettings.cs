@@ -18,6 +18,12 @@ namespace Classify8.Core
         public ConflictResolution SameSizeResolution { get; set; } = ConflictResolution.Rename;
         public ConflictResolution DiffSizeResolution { get; set; } = ConflictResolution.Rename;
 
+        // サイズが同じでタイムスタンプだけ異なる場合に、内容(バイト列)を比較して同一ファイルか判定する
+        public bool CompareContentWhenTimestampDiffers { get; set; } = true;
+
+        // 内容比較を行う上限サイズ(MB)。0 = 無制限。上限を超えるファイルは内容比較せず従来どおり判定する
+        public int ContentCompareMaxSizeMB { get; set; } = 0;
+
         // --- 2. 振り分けないファイル ---
         public string GlobalNgKeywords { get; set; } = "";
 

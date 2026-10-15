@@ -22,6 +22,8 @@ namespace Classify8.Views
             SetRadioFromResolution(ResultSettings.SameSizeResolution, rbSameKeepNewer, rbSameKeepOlder, rbSameRename, rbSameSkip);
             SetRadioFromResolution(ResultSettings.DiffSizeResolution, rbDiffKeepNewer, rbDiffKeepOlder, rbDiffRename, rbDiffSkip);
 
+            chkCompareContent.IsChecked = ResultSettings.CompareContentWhenTimestampDiffers;
+
             // NGキーワード
             txtNgKeywords.Text = ResultSettings.GlobalNgKeywords;
 
@@ -48,6 +50,8 @@ namespace Classify8.Views
         {
             ResultSettings.SameSizeResolution = GetResolutionFromRadio(rbSameKeepNewer, rbSameKeepOlder, rbSameRename, rbSameSkip);
             ResultSettings.DiffSizeResolution = GetResolutionFromRadio(rbDiffKeepNewer, rbDiffKeepOlder, rbDiffRename, rbDiffSkip);
+
+            ResultSettings.CompareContentWhenTimestampDiffers = chkCompareContent.IsChecked ?? true;
 
             ResultSettings.GlobalNgKeywords = txtNgKeywords.Text;
 

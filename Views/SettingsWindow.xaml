@@ -28,6 +28,14 @@
                         <RadioButton Name="rbDiffRename" Content="ファイル名を変えて振り分ける" Margin="0,0,0,5"/>
                         <RadioButton Name="rbDiffSkip" Content="振り分けない"/>
                     </StackPanel>
+
+                    <Separator Margin="0,15,0,10"/>
+                    <CheckBox Name="chkCompareContent" Margin="0,0,0,3">
+                        <TextBlock TextWrapping="Wrap"
+                                   Text="サイズが同じでタイムスタンプだけ異なる場合、内容を比較して同一ファイルか判定する"/>
+                    </CheckBox>
+                    <TextBlock Margin="20,0,0,0" Foreground="Gray" FontSize="11" TextWrapping="Wrap"
+                               Text="※内容が完全に同じ場合は重複として扱い、上記の同名ファイル処理より優先されます。大きなファイルや低速なドライブでは時間がかかる場合があります。"/>
                 </StackPanel>
             </TabItem>
 
