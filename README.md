@@ -131,3 +131,14 @@
 * **ビルド**: `dotnet build`
 * **テスト**: `dotnet test Classify8.Tests/Classify8.Tests.csproj`（xUnit + FlaUI）。UIテストは実際にアプリを操作するため、実行中はマウス・キーボードに触れないでください。UIテストを除く場合は `--filter "FullyQualifiedName!~FullUITests"` を付けます。詳細は `Classify8.Tests/README.md` を参照してください。
 * **言語ファイル**: 内蔵の文字列は `Resources/Lang/{ja,en}.json`（アプリに埋め込み）です。XAML では `{loc:Tr キー}`、コードでは `Loc.T` / `Loc.F` で参照します。キーを追加・変更したら、`Languages/_template.json` も英語版と同じ内容にそろえてください。
+
+---
+
+## 6. ライセンス
+
+本ソフトウェアは [MIT License](LICENSE) のもとで公開しています。
+
+* 無償で使用・複製・改変・再配布（有償での配布を含む）できます。再配布する場合は、著作権表示とライセンス文（`LICENSE`）を含めてください。
+* 本ソフトウェアは無保証です。使用によって生じたいかなる損害についても、作者は責任を負いません。
+
+Copyright (c) 2026 Yagennankoz

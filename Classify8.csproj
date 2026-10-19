@@ -24,6 +24,7 @@
     <None Update="Help*.html">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="LICENSE" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <!-- 画面・メッセージの文字列(言語ファイル)。アプリに埋め込む -->
