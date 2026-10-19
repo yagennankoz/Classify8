@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -14,6 +15,10 @@ namespace Classify8.Views
         private bool _isEditing = false;
 
         private ObservableCollection<SortRuleViewModel> _rulesList;
+
+        // 「個別指定に変換して削除」の予約 (プリセットID → パス)
+        // 「保存」を押すまでは実際のルールを書き換えず、「キャンセル」なら破棄する
+        private readonly Dictionary<string, string> _pendingConversions = new Dictionary<string, string>();
 
         public PresetManagerWindow(ObservableCollection<Preset> existingPresets, ObservableCollection<SortRuleViewModel> rulesList)
         {
@@ -57,7 +62,7 @@ namespace Classify8.Views
 
         private void BtnAdd_Click(object sender, RoutedEventArgs e)
         {
-            var newPreset = new Preset { AliasName = "新規プリセット", DirectoryPath = "C:\\" };
+            var newPreset = new Preset { AliasName = Loc.T("preset.new_name"), DirectoryPath = "" }; // パスは利用者が入力する (C:\\ 等を仮置きしない)
             Presets.Add(newPreset);
             lvPresets.SelectedItem = newPreset; // 追加したものを自動で選択状態にする
             txtAliasName.Focus();
@@ -85,23 +90,8 @@ namespace Classify8.Views
                     }
                     else if (confirmDialog.ResultAction == DeleteAction.Convert)
                     {
-                        // 個別指定(Custom)に変換してパスを書き写す
-                        foreach (var ruleVm in usedRules)
-                        {
-                            var rule = ruleVm.Rule;
-                            if (rule.SourceMode == "Preset" && rule.SourcePresetId == selected.Id)
-                            {
-                                rule.SourceMode = "Custom";
-                                rule.SourceCustomPath = selected.DirectoryPath;
-                                rule.SourcePresetId = "";
-                            }
-                            if (rule.DestMode == "Preset" && rule.DestPresetId == selected.Id)
-                            {
-                                rule.DestMode = "Custom";
-                                rule.DestCustomPath = selected.DirectoryPath;
-                                rule.DestPresetId = "";
-                            }
-                        }
+                        // 個別指定(Custom)への変換は、「保存」を押したときに行う (キャンセルされたら何も変えない)
+                        _pendingConversions[selected.Id] = selected.DirectoryPath;
                     }
                     // Force(強制削除)の場合は何もしない（そのまま削除処理へ）
                 }
@@ -127,7 +117,7 @@ namespace Classify8.Views
             // .NET 8 の WPF 標準機能である OpenFolderDialog
             var dialog = new OpenFolderDialog
             {
-                Title = "フォルダの選択"
+                Title = Loc.T("dialog.select_folder")
             };
             
             if (dialog.ShowDialog() == true)
@@ -138,6 +128,44 @@ namespace Classify8.Views
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
+            // 入力チェック
+            foreach (var p in Presets)
+            {
+                if (string.IsNullOrWhiteSpace(p.AliasName))
+                {
+                    MessageBox.Show(this, Loc.T("msg.preset_name_empty"), Loc.T("title.input_error"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    lvPresets.SelectedItem = p;
+                    return;
+                }
+                if (string.IsNullOrWhiteSpace(p.DirectoryPath))
+                {
+                    MessageBox.Show(this, Loc.F("msg.preset_path_empty", p.AliasName), Loc.T("title.input_error"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    lvPresets.SelectedItem = p;
+                    return;
+                }
+            }
+
+            // 予約しておいた「個別指定への変換」を、ここで初めてルールに反映する
+            if (_pendingConversions.Count > 0)
+            {
+                foreach (var ruleVm in _rulesList)
+                {
+                    var rule = ruleVm.Rule;
+                    if (rule.SourceMode == "Preset" && _pendingConversions.TryGetValue(rule.SourcePresetId ?? "", out string srcPath))
+                    {
+                        rule.SourceMode = "Custom";
+                        rule.SourceCustomPath = srcPath;
+                        rule.SourcePresetId = "";
+                    }
+                    if (rule.DestMode == "Preset" && _pendingConversions.TryGetValue(rule.DestPresetId ?? "", out string destPath))
+                    {
+                        rule.DestMode = "Custom";
+                        rule.DestCustomPath = destPath;
+                        rule.DestPresetId = "";
+                    }
+                }
+            }
+
             DialogResult = true; // 成功として閉じる
             Close();
         }

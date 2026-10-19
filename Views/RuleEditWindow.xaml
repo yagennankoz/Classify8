@@ -1,7 +1,8 @@
 <Window x:Class="Classify8.Views.RuleEditWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="振り分け条件の編集"
+        xmlns:loc="clr-namespace:Classify8.Localization"
+        Title="{loc:Tr rule.title}"
         Width="680"
         MinHeight="400"
         SizeToContent="Height"
@@ -51,7 +52,7 @@
                                         <!-- 有効・名称 -->
                                         <TextBlock Grid.Row="0"
                                                    Grid.Column="0"
-                                                   Text="設定名:"
+                                                   Text="{loc:Tr rule.label.name}"
                                                    VerticalAlignment="Center"
                                                    FontWeight="Bold"/>
                                         <StackPanel Grid.Row="0"
@@ -59,7 +60,7 @@
                                                     Orientation="Horizontal"
                                                     Margin="0,0,0,10">
                                                 <CheckBox Name="chkIsEnabled"
-                                                          Content="有効にする"
+                                                          Content="{loc:Tr rule.enabled}"
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,15,0"/>
                                                 <TextBox Name="txtRuleName"
@@ -71,7 +72,7 @@
                                         <!-- 振り分け元 -->
                                         <TextBlock Grid.Row="1"
                                                    Grid.Column="0"
-                                                   Text="振り分け元:"
+                                                   Text="{loc:Tr rule.label.source}"
                                                    VerticalAlignment="Top"
                                                    Margin="0,5,0,0"
                                                    FontWeight="Bold"/>
@@ -83,7 +84,7 @@
                                                 Margin="0,0,0,10">
                                                 <StackPanel>
                                                         <RadioButton Name="rbSourcePreset"
-                                                                     Content="プリセットを使用"
+                                                                     Content="{loc:Tr rule.use_preset}"
                                                                      GroupName="SourceGrp"
                                                                      Checked="SourceMode_Changed"
                                                                      Unchecked="SourceMode_Changed"
@@ -108,7 +109,7 @@
                                                         </ComboBox>
 
                                                         <RadioButton Name="rbSourceCustom"
-                                                                     Content="個別にフォルダを指定"
+                                                                     Content="{loc:Tr rule.use_custom}"
                                                                      GroupName="SourceGrp"
                                                                      Checked="SourceMode_Changed"
                                                                      Unchecked="SourceMode_Changed"
@@ -126,28 +127,28 @@
                                                                                 <ToolTip>
                                                                                         <TextBlock>
                                                 <Run FontWeight="Bold"
-                                                                                                Text="【パスに使える自動挿入タグ】"/><LineBreak/>
-                                                <Run Text="/YYYY, /YY : 実行年 (4桁, 2桁)"/><LineBreak/>
-                                                <Run Text="/MM : 実行月    /DD : 実行日"/><LineBreak/>
-                                                <Run Text="/NAME : 設定名 (振り分け条件名)"/><LineBreak/>
-                                                <Run Text="/COND : 検索条件 (スラッシュは除外)"/><LineBreak/>
+                                                                                                Text="{loc:Tr tags.title}"/><LineBreak/>
+                                                <Run Text="{loc:Tr tags.year}"/><LineBreak/>
+                                                <Run Text="{loc:Tr tags.month_day}"/><LineBreak/>
+                                                <Run Text="{loc:Tr tags.name}"/><LineBreak/>
+                                                <Run Text="{loc:Tr tags.cond}"/><LineBreak/>
                                                 <Run Foreground="Gray"
-                                                                                                Text="※大文字・小文字どちらでも使用可能"/><LineBreak/>
+                                                                                                Text="{loc:Tr tags.case}"/><LineBreak/>
                                                 <Run Foreground="#D32F2F"
-                                                                                                Text="※ファイルの更新日時(/FYYなど)は振り分け先のみ使用可能です"/>
+                                                                                                Text="{loc:Tr rule.tags.file_note}"/>
                                                                                         </TextBlock>
                                                                                 </ToolTip>
                                                                         </TextBox.ToolTip>
                                                                 </TextBox>
                                                                 <Button Name="btnSourceBrowse"
                                                                         Grid.Column="1"
-                                                                        Content="参照..."
+                                                                        Content="{loc:Tr common.browse}"
                                                                         Width="60"
                                                                         Height="25"
                                                                         Click="BtnSourceBrowse_Click"/>
                                                         </Grid>
                                                         <CheckBox Name="chkSearchSubDirs"
-                                                                  Content="サブフォルダも対象とする"
+                                                                  Content="{loc:Tr rule.subdirs}"
                                                                   Margin="20,5,0,0"
                                                                   FontWeight="Bold"
                                                                   Foreground="#1976D2"/>
@@ -157,7 +158,7 @@
                                         <!-- 振り分け先 -->
                                         <TextBlock Grid.Row="2"
                                                    Grid.Column="0"
-                                                   Text="振り分け先:"
+                                                   Text="{loc:Tr rule.label.dest}"
                                                    VerticalAlignment="Top"
                                                    Margin="0,5,0,0"
                                                    FontWeight="Bold"/>
@@ -169,7 +170,7 @@
                                                 Margin="0,0,0,10">
                                                 <StackPanel>
                                                         <RadioButton Name="rbDestPreset"
-                                                                     Content="プリセットを使用"
+                                                                     Content="{loc:Tr rule.use_preset}"
                                                                      GroupName="DestGrp"
                                                                      Checked="DestMode_Changed"
                                                                      Unchecked="DestMode_Changed"
@@ -194,7 +195,7 @@
                                                         </ComboBox>
 
                                                         <RadioButton Name="rbDestCustom"
-                                                                     Content="個別にフォルダを指定"
+                                                                     Content="{loc:Tr rule.use_custom}"
                                                                      GroupName="DestGrp"
                                                                      Checked="DestMode_Changed"
                                                                      Unchecked="DestMode_Changed"
@@ -212,38 +213,37 @@
                                                                                 <ToolTip>
                                                                                         <TextBlock>
                                                 <Run FontWeight="Bold"
-                                                                                                Text="【パスに使える自動挿入タグ】"/><LineBreak/>
-                                                <Run Text="/YYYY, /YY : 実行年 (4桁, 2桁)"/><LineBreak/>
-                                                <Run Text="/MM : 実行月    /DD : 実行日"/><LineBreak/>
-                                                <Run Text="/FYYYY, /FYY : ファイル更新年"/><LineBreak/>
-                                                <Run Text="/FMM : ファイル更新月  /FDD : 更新日"/><LineBreak/>
-                                                <Run Text="/NAME : 設定名 (振り分け条件名)"/><LineBreak/>
-                                                <Run Text="/COND : 検索条件 (スラッシュは除外)"/><LineBreak/>
+                                                                                                Text="{loc:Tr tags.title}"/><LineBreak/>
+                                                <Run Text="{loc:Tr tags.year}"/><LineBreak/>
+                                                <Run Text="{loc:Tr tags.month_day}"/><LineBreak/>
+                                                <Run Text="{loc:Tr tags.fyear}"/><LineBreak/>
+                                                <Run Text="{loc:Tr tags.fmonth_day}"/><LineBreak/>
+                                                <Run Text="{loc:Tr tags.name}"/><LineBreak/>
+                                                <Run Text="{loc:Tr tags.cond}"/><LineBreak/>
                                                 <Run Foreground="Gray"
-                                                                                                Text="※大文字・小文字どちらでも使用可能"/>
+                                                                                                Text="{loc:Tr tags.case}"/>
                                                                                         </TextBlock>
                                                                                 </ToolTip>
                                                                         </TextBox.ToolTip>
                                                                 </TextBox>
                                                                 <Button Name="btnDestBrowse"
                                                                         Grid.Column="1"
-                                                                        Content="参照..."
+                                                                        Content="{loc:Tr common.browse}"
                                                                         Width="60"
                                                                         Height="25"
                                                                         Click="BtnDestBrowse_Click"/>
                                                         </Grid>
                                                         <CheckBox Name="chkIsCopy"
-                                                                  Content="振り分け(移動)ではなく、コピーする"
+                                                                  Content="{loc:Tr rule.copy_instead}"
                                                                   Margin="20,5,0,0"
                                                                   FontWeight="Bold"
                                                                   Foreground="#D32F2F"/>
                                                 </StackPanel>
                                         </Border>
 
-                                        <!-- 🚨 変更: 検索条件の枠と説明文を強調 -->
                                         <TextBlock Grid.Row="3"
                                                    Grid.Column="0"
-                                                   Text="検索条件:"
+                                                   Text="{loc:Tr rule.label.condition}"
                                                    VerticalAlignment="Top"
                                                    Margin="0,5,0,0"
                                                    FontWeight="Bold"
@@ -263,8 +263,8 @@
                                                            FontSize="11"
                                                            Margin="0,4,0,0"
                                                            TextWrapping="Wrap">
-                            <Run Text="※ワイルドカード (*, ?) が使用可能です。  演算子: /&amp; (AND)  /| (OR)  /! (NOT)  /( /) (カッコ)"/><LineBreak/>
-                            <Run Text="※空白を含むキーワードは &quot; &quot; (ダブルクォート) で囲んでください。 (例: &quot;AAA BBB&quot;)"/>
+                            <Run Text="{loc:Tr rule.cond_help1}"/><LineBreak/>
+                            <Run Text="{loc:Tr rule.cond_help2}"/>
                                                 </TextBlock>
                                         </StackPanel>
                                 </Grid>
@@ -275,40 +275,40 @@
                                 <TabControl Grid.Row="1"
                                             Margin="0,5,0,0">
                                         <!-- 【一般】 -->
-                                        <TabItem Header="一般">
+                                        <TabItem Header="{loc:Tr rule.tab.general}">
                                                 <StackPanel Margin="15">
                                                         <CheckBox Name="chkIgnoreCase"
-                                                                  Content="大文字/小文字を区別しない"
+                                                                  Content="{loc:Tr rule.ignore_case}"
                                                                   Margin="0,0,0,8"/>
                                                         <CheckBox Name="chkIgnoreWidth"
-                                                                  Content="半角/全角を区別しない"
+                                                                  Content="{loc:Tr rule.ignore_width}"
                                                                   Margin="0,0,0,8"/>
                                                         <CheckBox Name="chkIgnoreKana"
-                                                                  Content="ひらがな/カタカナを区別しない"
+                                                                  Content="{loc:Tr rule.ignore_kana}"
                                                                   Margin="0,0,0,8"/>
                                                         <CheckBox Name="chkDoNotSaveHistory"
-                                                                  Content="振り分け履歴に保存しない"
+                                                                  Content="{loc:Tr rule.no_history}"
                                                                   Margin="0,0,0,20"/>
 
-                                                        <TextBlock Text="振り分け対象:"
+                                                        <TextBlock Text="{loc:Tr rule.label.target}"
                                                                    FontWeight="Bold"
                                                                    Margin="0,0,0,5"/>
                                                         <ComboBox Name="cmbTargetType"
                                                                   Width="200"
                                                                   HorizontalAlignment="Left"
                                                                   Height="25">
-                                                                <ComboBoxItem Content="ファイルのみ"
+                                                                <ComboBoxItem Content="{loc:Tr rule.target.file}"
                                                                               Tag="FileOnly"/>
-                                                                <ComboBoxItem Content="フォルダのみ"
+                                                                <ComboBoxItem Content="{loc:Tr rule.target.folder}"
                                                                               Tag="DirectoryOnly"/>
-                                                                <ComboBoxItem Content="ファイル＋フォルダ"
+                                                                <ComboBoxItem Content="{loc:Tr rule.target.both}"
                                                                               Tag="Both"/>
                                                         </ComboBox>
                                                 </StackPanel>
                                         </TabItem>
 
                                         <!-- 【ファイルサイズ限定】 -->
-                                        <TabItem Header="ファイルサイズ限定">
+                                        <TabItem Header="{loc:Tr rule.tab.size}">
                                                 <StackPanel Margin="15">
                                                         <StackPanel Orientation="Horizontal"
                                                                     Margin="0,0,0,15">
@@ -321,17 +321,17 @@
                                                                          Margin="0,0,5,0"
                                                                          VerticalContentAlignment="Center"/>
                                                                 <ComboBox Name="cmbSizeMinUnit"
-                                                                          Width="60"
+                                                                          Width="70"
                                                                           Height="25"
                                                                           Margin="0,0,10,0">
-                                                                        <ComboBoxItem Content="バイト"
+                                                                        <ComboBoxItem Content="{loc:Tr rule.unit.byte}"
                                                                                       Tag="Byte"/>
                                                                         <ComboBoxItem Content="KB"
                                                                                       Tag="KB"/>
                                                                         <ComboBoxItem Content="MB"
                                                                                       Tag="MB"/>
                                                                 </ComboBox>
-                                                                <TextBlock Text="以下のファイルを振り分け対象としない"
+                                                                <TextBlock Text="{loc:Tr rule.size_min_note}"
                                                                            VerticalAlignment="Center"/>
                                                         </StackPanel>
 
@@ -346,24 +346,24 @@
                                                                          Margin="0,0,5,0"
                                                                          VerticalContentAlignment="Center"/>
                                                                 <ComboBox Name="cmbSizeMaxUnit"
-                                                                          Width="60"
+                                                                          Width="70"
                                                                           Height="25"
                                                                           Margin="0,0,10,0">
-                                                                        <ComboBoxItem Content="バイト"
+                                                                        <ComboBoxItem Content="{loc:Tr rule.unit.byte}"
                                                                                       Tag="Byte"/>
                                                                         <ComboBoxItem Content="KB"
                                                                                       Tag="KB"/>
                                                                         <ComboBoxItem Content="MB"
                                                                                       Tag="MB"/>
                                                                 </ComboBox>
-                                                                <TextBlock Text="以上のファイルを振り分け対象としない"
+                                                                <TextBlock Text="{loc:Tr rule.size_max_note}"
                                                                            VerticalAlignment="Center"/>
                                                         </StackPanel>
                                                 </StackPanel>
                                         </TabItem>
 
                                         <!-- 【タイムスタンプ限定】 -->
-                                        <TabItem Header="タイムスタンプ限定">
+                                        <TabItem Header="{loc:Tr rule.tab.timestamp}">
                                                 <StackPanel Margin="15">
                                                         <StackPanel Orientation="Horizontal"
                                                                     Margin="0,0,0,15">
@@ -374,7 +374,7 @@
                                                                             Width="120"
                                                                             Height="25"
                                                                             Margin="0,0,10,0"/>
-                                                                <TextBlock Text="以前のファイルを振り分け対象としない"
+                                                                <TextBlock Text="{loc:Tr rule.ts.date_before}"
                                                                            VerticalAlignment="Center"/>
                                                         </StackPanel>
 
@@ -387,7 +387,7 @@
                                                                             Width="120"
                                                                             Height="25"
                                                                             Margin="0,0,10,0"/>
-                                                                <TextBlock Text="以降のファイルを振り分け対象としない"
+                                                                <TextBlock Text="{loc:Tr rule.ts.date_after}"
                                                                            VerticalAlignment="Center"/>
                                                         </StackPanel>
 
@@ -402,17 +402,17 @@
                                                                          Margin="0,0,5,0"
                                                                          VerticalContentAlignment="Center"/>
                                                                 <ComboBox Name="cmbTimeBeforeUnit"
-                                                                          Width="50"
+                                                                          Width="80"
                                                                           Height="25"
                                                                           Margin="0,0,10,0">
-                                                                        <ComboBoxItem Content="日"
+                                                                        <ComboBoxItem Content="{loc:Tr rule.unit.day}"
                                                                                       Tag="Day"/>
-                                                                        <ComboBoxItem Content="週"
+                                                                        <ComboBoxItem Content="{loc:Tr rule.unit.week}"
                                                                                       Tag="Week"/>
-                                                                        <ComboBoxItem Content="月"
+                                                                        <ComboBoxItem Content="{loc:Tr rule.unit.month}"
                                                                                       Tag="Month"/>
                                                                 </ComboBox>
-                                                                <TextBlock Text="以前のファイルを振り分け対象としない"
+                                                                <TextBlock Text="{loc:Tr rule.ts.rel_before}"
                                                                            VerticalAlignment="Center"/>
                                                         </StackPanel>
 
@@ -427,17 +427,17 @@
                                                                          Margin="0,0,5,0"
                                                                          VerticalContentAlignment="Center"/>
                                                                 <ComboBox Name="cmbTimeAfterUnit"
-                                                                          Width="50"
+                                                                          Width="80"
                                                                           Height="25"
                                                                           Margin="0,0,10,0">
-                                                                        <ComboBoxItem Content="日"
+                                                                        <ComboBoxItem Content="{loc:Tr rule.unit.day}"
                                                                                       Tag="Day"/>
-                                                                        <ComboBoxItem Content="週"
+                                                                        <ComboBoxItem Content="{loc:Tr rule.unit.week}"
                                                                                       Tag="Week"/>
-                                                                        <ComboBoxItem Content="月"
+                                                                        <ComboBoxItem Content="{loc:Tr rule.unit.month}"
                                                                                       Tag="Month"/>
                                                                 </ComboBox>
-                                                                <TextBlock Text="以降のファイルを振り分け対象としない"
+                                                                <TextBlock Text="{loc:Tr rule.ts.rel_after}"
                                                                            VerticalAlignment="Center"/>
                                                         </StackPanel>
                                                 </StackPanel>
@@ -452,7 +452,7 @@
                 <StackPanel Grid.Row="1"
                             Orientation="Horizontal"
                             HorizontalAlignment="Right">
-                        <Button Content="保存して閉じる"
+                        <Button Content="{loc:Tr common.save_close}"
                                 Width="120"
                                 Height="35"
                                 Margin="0,0,10,0"
@@ -460,7 +460,7 @@
                                 Foreground="White"
                                 FontWeight="Bold"
                                 Click="BtnSave_Click"/>
-                        <Button Content="キャンセル"
+                        <Button Content="{loc:Tr common.cancel}"
                                 Width="90"
                                 Height="35"
                                 Click="BtnCancel_Click"/>

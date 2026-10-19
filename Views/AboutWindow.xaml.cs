@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Navigation;
+using Classify8.Core;
 
 namespace Classify8.Views
 {
@@ -21,7 +22,7 @@ namespace Classify8.Views
                 versionText = versionText.Substring(0, plusIndex);
             }
 
-            txtVersion.Text = $"バージョン: {versionText}";
+            txtVersion.Text = Loc.F("about.version", versionText);
         }
 
         // ==========================================

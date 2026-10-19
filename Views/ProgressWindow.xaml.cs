@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Windows;
+using Classify8.Core;
 
 namespace Classify8.Views
 {
@@ -26,13 +27,13 @@ namespace Classify8.Views
 
             txtRuleName.Text = ruleName;
             txtFileName.Text = fileName;
-            txtCounts.Text = $"処理完了: {processedCount} 件  /  エラー: {errorCount} 件";
+            txtCounts.Text = Loc.F("progress.counts", processedCount, errorCount);
         }
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
         {
             btnCancel.IsEnabled = false;
-            btnCancel.Content = "キャンセルしています...";
+            btnCancel.Content = Loc.T("progress.canceling");
             _cts.Cancel(); // 処理エンジンに中止信号を送る
         }
 

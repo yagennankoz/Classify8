@@ -9,7 +9,7 @@ namespace Classify8.Core
 
     public class SortRule
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString(); // 🚨追加: 一意のID
+        public string Id { get; set; } = Guid.NewGuid().ToString();
         public string RuleName { get; set; } = "";
         public bool IsEnabled { get; set; } = true;
 
@@ -58,33 +58,52 @@ namespace Classify8.Core
         public SortRule Clone()
         {
             var clone = (SortRule)this.MemberwiseClone();
-            clone.Id = Guid.NewGuid().ToString(); // 🚨追加: コピー時はIDを新しく発行する
+            clone.Id = Guid.NewGuid().ToString();
+            clone.CompiledCondition = null;       // 設定が変わる可能性があるため、次回使用時に再コンパイルさせる
             return clone;
         }
 
         public void CompileCondition()
         {
-            var parser = new ConditionParser(ignoreCase: IgnoreCase);
+            var parser = new ConditionParser(ignoreCase: IgnoreCase, ignoreWidth: IgnoreWidth, ignoreKana: IgnoreKana);
             CompiledCondition = parser.Parse(SearchCondition);
+        }
+
+        /// <summary>
+        /// 列挙時に取得済みの情報(サイズ・更新日時)を使って判定する。ファイルシステムへの追加アクセスが発生しない。
+        /// </summary>
+        public bool IsMatch(System.IO.FileSystemInfo info)
+        {
+            bool isDirectory = (info.Attributes & System.IO.FileAttributes.Directory) == System.IO.FileAttributes.Directory;
+            long size = (info is System.IO.FileInfo fi) ? fi.Length : 0;
+            return IsMatchCore(info.Name, isDirectory, size, info.LastWriteTime);
         }
 
         public bool IsMatch(string itemPath, bool isDirectory)
         {
+            if (isDirectory)
+            {
+                var di = new System.IO.DirectoryInfo(itemPath);
+                return IsMatchCore(di.Name, true, 0, di.LastWriteTime);
+            }
+
+            var fi = new System.IO.FileInfo(itemPath);
+            return IsMatchCore(fi.Name, false, fi.Length, fi.LastWriteTime);
+        }
+
+        private bool IsMatchCore(string name, bool isDirectory, long size, DateTime lastWrite)
+        {
             if (CompiledCondition == null) CompileCondition();
 
-            string name = System.IO.Path.GetFileName(itemPath);
-
-            if (!CompiledCondition.Evaluate(name)) return false;
+            // 全角/半角・ひらがな/カタカナの揺れ吸収は、名前側もここで1回だけ正規化する
+            string normalizedName = TextNormalizer.Normalize(name, IgnoreWidth, IgnoreKana);
+            if (!CompiledCondition.Evaluate(normalizedName)) return false;
 
             if (!isDirectory)
             {
-                long size = new System.IO.FileInfo(itemPath).Length;
-
                 if (SizeMin_Enabled && size <= GetBytes(SizeMin_Value, SizeMin_Unit)) return false;
                 if (SizeMax_Enabled && size >= GetBytes(SizeMax_Value, SizeMax_Unit)) return false;
             }
-
-            DateTime lastWrite = isDirectory ? new System.IO.DirectoryInfo(itemPath).LastWriteTime : new System.IO.FileInfo(itemPath).LastWriteTime;
 
             if (DateBefore_Enabled && DateBefore_Date.HasValue && lastWrite <= DateBefore_Date.Value) return false;
             if (DateAfter_Enabled && DateAfter_Date.HasValue && lastWrite >= DateAfter_Date.Value) return false;

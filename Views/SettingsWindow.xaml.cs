@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Diagnostics;
@@ -18,6 +21,13 @@ namespace Classify8.Views
 
         private void LoadDataToUI()
         {
+            // 表示言語: 「自動」+ 選べる言語の一覧
+            var languages = new List<LanguageInfo> { new LanguageInfo(Loc.AutoSetting, Loc.T("settings.language_auto")) };
+            languages.AddRange(Loc.AvailableLanguages);
+            cmbLanguage.ItemsSource = languages;
+            var selectedLanguage = languages.FirstOrDefault(l => l.Code.Equals(ResultSettings.Language, StringComparison.OrdinalIgnoreCase));
+            cmbLanguage.SelectedValue = selectedLanguage?.Code ?? Loc.AutoSetting;
+
             // 同名ファイル
             SetRadioFromResolution(ResultSettings.SameSizeResolution, rbSameKeepNewer, rbSameKeepOlder, rbSameRename, rbSameSkip);
             SetRadioFromResolution(ResultSettings.DiffSizeResolution, rbDiffKeepNewer, rbDiffKeepOlder, rbDiffRename, rbDiffSkip);
@@ -36,6 +46,7 @@ namespace Classify8.Views
             chkAutoCreateDest.IsChecked = ResultSettings.AutoCreateDestFolder;
             chkStartMinimized.IsChecked = ResultSettings.StartMinimized;
             chkSilentReadOnly.IsChecked = ResultSettings.SilentReadOnly;
+            chkConfirmDoubleClick.IsChecked = ResultSettings.ConfirmBeforeDoubleClickRun;
 
             chkLimitHistory.IsChecked = ResultSettings.LimitHistoryCount;
             txtHistoryLimit.Text = ResultSettings.HistoryLimitHundreds.ToString();
@@ -48,6 +59,8 @@ namespace Classify8.Views
 
         private void SaveDataFromUI()
         {
+            ResultSettings.Language = cmbLanguage.SelectedValue as string ?? Loc.AutoSetting;
+
             ResultSettings.SameSizeResolution = GetResolutionFromRadio(rbSameKeepNewer, rbSameKeepOlder, rbSameRename, rbSameSkip);
             ResultSettings.DiffSizeResolution = GetResolutionFromRadio(rbDiffKeepNewer, rbDiffKeepOlder, rbDiffRename, rbDiffSkip);
 
@@ -62,6 +75,7 @@ namespace Classify8.Views
             ResultSettings.AutoCreateDestFolder = chkAutoCreateDest.IsChecked ?? true;
             ResultSettings.StartMinimized = chkStartMinimized.IsChecked ?? false;
             ResultSettings.SilentReadOnly = chkSilentReadOnly.IsChecked ?? true;
+            ResultSettings.ConfirmBeforeDoubleClickRun = chkConfirmDoubleClick.IsChecked ?? false;
 
             ResultSettings.LimitHistoryCount = chkLimitHistory.IsChecked ?? true;
             if (int.TryParse(txtHistoryLimit.Text, out int hundreds)) ResultSettings.HistoryLimitHundreds = hundreds;
@@ -103,6 +117,20 @@ namespace Classify8.Views
         // --- ボタン ---
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
+            // 数値の入力チェック (不正な値が黙って無視・全消去につながらないようにする)
+            if (rbPeriodicOn.IsChecked == true && !(int.TryParse(txtPeriodicMinutes.Text, out int minutes) && minutes >= 1))
+            {
+                MessageBox.Show(this, Loc.T("msg.periodic_invalid"), Loc.T("title.input_error"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtPeriodicMinutes.Focus();
+                return;
+            }
+            if (chkLimitHistory.IsChecked == true && !(int.TryParse(txtHistoryLimit.Text, out int hundreds) && hundreds >= 1))
+            {
+                MessageBox.Show(this, Loc.T("msg.history_limit_invalid"), Loc.T("title.input_error"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtHistoryLimit.Focus();
+                return;
+            }
+
             SaveDataFromUI();
             DialogResult = true;
         }
@@ -116,8 +144,8 @@ namespace Classify8.Views
         {
             var dialog = new Microsoft.Win32.OpenFileDialog
             {
-                Title = "ClassyNyの振り分け条件CSVファイルを選択してください",
-                Filter = "CSVファイル (*.csv)|*.csv|すべてのファイル (*.*)|*.*"
+                Title = Loc.T("dialog.import_csv_title"),
+                Filter = Loc.T("dialog.import_csv_filter")
             };
 
             if (dialog.ShowDialog() == true)

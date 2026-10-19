@@ -28,7 +28,15 @@ namespace Classify8
 
         private readonly System.Threading.SemaphoreSlim _saveLock = new System.Threading.SemaphoreSlim(1, 1);
 
+        private System.Windows.Forms.ToolStripMenuItem _trayShowItem; // 表示言語の切り替えで文字を更新するため保持する
+        private System.Windows.Forms.ToolStripMenuItem _trayExitItem;
         private System.Drawing.Icon _normalIcon;
+        private bool _normalIconIsShared = false; // SystemIcons など、Dispose してはいけない共有アイコンか
+
+        // 実行中の振り分け処理のキャンセル用トークンと、終了要求の状態
+        private System.Threading.CancellationTokenSource _currentCts;
+        private bool _exitRequested = false;
+        private bool _sessionEnding = false;
         private System.Drawing.Icon _blankIcon;
         private System.Windows.Threading.DispatcherTimer _blinkTimer;
         private bool _isIconBlank = false;
@@ -39,6 +47,21 @@ namespace Classify8
         public MainWindow()
         {
             InitializeComponent();
+
+            // データの読み込み/保存エラーを画面に通知する (Core 層が UI に依存しないようにするため)
+            DataManager.ErrorReporter = msg => Dispatcher.InvokeAsync(
+                () => MessageBox.Show(msg, Loc.T("title.error"), MessageBoxButton.OK, MessageBoxImage.Error));
+
+            // 表示言語が切り替わったときに、コードで設定している文字列を更新する
+            Loc.LanguageChanged += OnLanguageChanged;
+
+            // Windows のシャットダウン/ログオフ時は、確認なしで処理を中止して終了できるようにする
+            Application.Current.SessionEnding += (s, args) =>
+            {
+                _sessionEnding = true;
+                _currentCts?.Cancel();
+            };
+
             CurrentSettings = DataManager.LoadSettings();
 
             ApplyProcessPriority(CurrentSettings.ProcessPriority);
@@ -68,6 +91,7 @@ namespace Classify8
 
         private SortRule _copyBuffer = null;
         private bool _isCutBuffer = false;
+        private SortRuleViewModel _cutSource = null; // 切り取り中のルール (貼り付けるまでリストに残す)
 
         // リストの選択状態が変わるたびに呼ばれ、メニューの有効/無効を切り替える
         private void LvRules_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -100,24 +124,6 @@ namespace Classify8
         }
 
 
-        private void LoadRules()
-        {
-            RulesList.Add(new SortRuleViewModel(new SortRule
-            {
-                RuleName = "画像データの退避",
-                SearchCondition = "*.jpg /| *.png",
-                IsMoveAction = true,
-                IsEnabled = true
-            }, PresetList));
-            RulesList.Add(new SortRuleViewModel(new SortRule
-            {
-                RuleName = "古い請求書のコピー",
-                SearchCondition = "/( 請求書 /| 見積書 /) /& /! 破棄",
-                IsMoveAction = false,
-                IsEnabled = false // テストとして無効に設定
-            }, PresetList));
-        }
-
         private void BtnAddRule_Click(object sender, RoutedEventArgs e)
         {
             var newRule = new SortRule(); // 空の新規ルールを作成
@@ -139,7 +145,7 @@ namespace Classify8
 
                 lvRules.SelectedItem = newRuleVm; // 追加した行を選択状態にする
                 SaveAllRules();
-                Log($"新しいルール「{window.ResultRule.RuleName}」を追加しました。");
+                Log(Loc.F("log.rule_added", window.ResultRule.RuleName));
             }
         }
 
@@ -159,12 +165,12 @@ namespace Classify8
                     SaveAllRules();
 
                     lvRules.SelectedIndex = index; // 選択状態を復元
-                    Log($"ルール「{window.ResultRule.RuleName}」を更新しました。");
+                    Log(Loc.F("log.rule_updated", window.ResultRule.RuleName));
                 }
             }
             else
             {
-                MessageBox.Show(this, "編集するルールを選択してください。", "お知らせ");
+                MessageBox.Show(this, Loc.T("msg.select_rule_to_edit"), Loc.T("title.info"));
             }
         }
 
@@ -173,10 +179,10 @@ namespace Classify8
             if (lvRules.SelectedItems.Count > 0)
             {
                 string msg = lvRules.SelectedItems.Count == 1
-                    ? "選択したルールを本当に削除しますか？"
-                    : $"{lvRules.SelectedItems.Count} 件のルールを本当に削除しますか？";
+                    ? Loc.T("msg.confirm_delete_one")
+                    : Loc.F("msg.confirm_delete_many", lvRules.SelectedItems.Count);
 
-                if (MessageBox.Show(this, msg, "確認", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                if (MessageBox.Show(this, msg, Loc.T("title.confirm"), MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
                 {
                     // 選択された複数行をリスト化してから一気に削除
                     var selectedItems = lvRules.SelectedItems.Cast<SortRuleViewModel>().ToList();
@@ -246,10 +252,11 @@ namespace Classify8
 
                 DataManager.SavePresets(PresetList);
 
-                // プリセットの名称やパスが変更されたら一覧表示を即座に更新する
-                lvRules.Items.Refresh();
+                // 「個別指定に変換」されたルールも保存し、名称やパスの変更を一覧に即座に反映する
+                SaveAllRules();
+                RefreshRuleList();
 
-                Log("プリセットを更新しました。");
+                Log(Loc.T("log.presets_updated"));
             }
         }
 
@@ -266,7 +273,8 @@ namespace Classify8
 
                 InitializeTimer();
 
-                Log("全体設定を保存しました。");
+                Loc.Initialize(CurrentSettings.Language); // 表示言語を反映する (画面は再起動なしで切り替わる)
+                Log(Loc.T("log.settings_saved"));
             }
         }
 
@@ -344,35 +352,66 @@ namespace Classify8
 
             if (e.ClickCount == 2 && rowItem != null)
             {
+                e.Handled = true; // ドラッグ操作などに進むのを防ぐ
+
+                // 誤ってダブルクリックしただけでファイルが移動されないよう、設定で確認を挟めるようにする
+                if (CurrentSettings.ConfirmBeforeDoubleClickRun &&
+                    MessageBox.Show(this, Loc.F("msg.confirm_run_rule", rowItem.RuleName), Loc.T("title.confirm"),
+                                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                {
+                    return;
+                }
+
                 var targetRules = new List<SortRuleViewModel> { rowItem };
                 _ = ExecuteSortingAsync(targetRules);
-
-                e.Handled = true; // ドラッグ操作などに進むのを防ぐ
                 return;
             }
 
-            if (rowItem != null)
-            {
-                if (lvRules.SelectedItems.Contains(rowItem))
-                {
-                    if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != ModifierKeys.None)
-                    {
-                        _dragStartPoint = null;
-                    }
-                    else
-                    {
-                        _dragStartPoint = e.GetPosition(null);
-                    }
-                }
-                else
-                {
-                    _dragStartPoint = null;
-                }
-            }
-            else
+            // 行以外(余白・スクロールバー・ヘッダー)を押した場合は、ドラッグを始めない
+            if (rowItem == null)
             {
                 _dragStartPoint = null;
+                return;
             }
+
+            // 有効/無効のチェックボックスの操作では、選択もドラッグも変えない
+            // (複数行を選択したままチェックを押して、まとめて切り替える操作を壊さないため)
+            if (IsOnToggleButton(e.OriginalSource as DependencyObject))
+            {
+                _dragStartPoint = null;
+                return;
+            }
+
+            // Ctrl / Shift を押しながらの操作は、複数選択のためなので、ドラッグは始めない
+            if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != ModifierKeys.None)
+            {
+                _dragStartPoint = null;
+                return;
+            }
+
+            // 押した行がまだ選択されていなければ、先にその行だけを選択する。
+            // (選択されていない行も、クリックし直さずにそのまま掴んで並び替えられるようにする。
+            //  すでに選択されている行を押した場合は、複数選択を保ったまま、まとめてドラッグできる)
+            if (!lvRules.SelectedItems.Contains(rowItem))
+            {
+                lvRules.SelectedItem = rowItem;
+            }
+
+            _dragStartPoint = e.GetPosition(null);
+        }
+
+        // クリックされた場所が、行の中のチェックボックス(ボタン類)かどうか
+        private static bool IsOnToggleButton(DependencyObject depObj)
+        {
+            while (depObj != null && !(depObj is ListViewItem))
+            {
+                if (depObj is System.Windows.Controls.Primitives.ToggleButton) return true;
+
+                depObj = (depObj is System.Windows.Media.Visual || depObj is System.Windows.Media.Media3D.Visual3D)
+                    ? VisualTreeHelper.GetParent(depObj)
+                    : LogicalTreeHelper.GetParent(depObj);
+            }
+            return false;
         }
 
 
@@ -487,16 +526,17 @@ namespace Classify8
 
             if (_isSorting)
             {
-                if (!isAutoExecution) Log("[警告] 現在別の振り分け処理が実行中です。完了するまでお待ちください。");
+                if (!isAutoExecution) Log(Loc.T("log.already_running"));
                 return;
             }
 
             _isSorting = true;
             var cts = new System.Threading.CancellationTokenSource();
+            _currentCts = cts;
 
             if (_notifyIcon != null)
             {
-                _notifyIcon.Text = "Classify8 - 自動振り分け実行中...";
+                _notifyIcon.Text = Loc.T("tray.running");
                 _blinkTimer.Start();
             }
 
@@ -510,17 +550,18 @@ namespace Classify8
 
             try
             {
-                txtStatus.Text = "処理中...";
+                txtStatus.Text = Loc.T("status.processing");
                 progressBar.Value = 30;
 
                 Log("=========================================");
-                Log($"[開始] 振り分け処理を開始しました。対象ルール: {targetRules.Count}件");
+                Log(Loc.F("log.start", targetRules.Count));
 
                 int totalProcessedCount = 0;
                 int totalErrorCount = 0;
                 int totalMovedCount = 0;
                 int totalCopiedCount = 0;
                 int totalDeletedCount = 0;
+                int totalWarningCount = 0;
 
                 int totalRules = targetRules.Count;
                 int currentRuleIndex = 0;
@@ -528,16 +569,10 @@ namespace Classify8
                 var historyRecords = new System.Collections.Concurrent.ConcurrentBag<SortHistory>();
                 var processor = new FileProcessor(CurrentSettings, msg => Dispatcher.InvokeAsync(() => Log(msg)));
 
-                var folderScanCache = new Dictionary<string, List<string>>();
+                var folderScanCache = new Dictionary<string, List<FileSystemInfo>>();
 
-                var ngKeywords = CurrentSettings.GlobalNgKeywords
-                    .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                    .Select(k => k.Trim())
-                    .Where(k => !string.IsNullOrEmpty(k))
-                    .ToList();
-                string ngConditionString = string.Join(" /| ", ngKeywords);
-                var ngParser = new ConditionParser(ignoreCase: true);
-                var ngConditionNode = string.IsNullOrEmpty(ngConditionString) ? null : ngParser.Parse(ngConditionString);
+                // 全体設定のNGキーワードを判定用の条件に変換する (1行 = 1キーワード。キーワードが無ければ null)
+                var ngConditionNode = NgKeywordBuilder.BuildNode(CurrentSettings.GlobalNgKeywords);
 
                 await System.Threading.Tasks.Task.Run(async () =>
                 {
@@ -558,12 +593,12 @@ namespace Classify8
                             }
                             catch (Exception ex)
                             {
-                                Dispatcher.Invoke(() => Log($"[エラー] 検索条件の構文エラー (ルール「{rule.RuleName}」): {ex.Message}"));
+                                Dispatcher.Invoke(() => Log(Loc.F("log.syntax_error", rule.RuleName, ex.Message)));
                                 Interlocked.Increment(ref totalErrorCount);
                                 continue; // 構文が壊れている場合は安全にこのルールをスキップ
                             }
 
-                            string displayRuleName = $"[{currentRuleIndex} / {totalRules} 件目]  {rule.RuleName}";
+                            string displayRuleName = Loc.F("progress.rule_display", currentRuleIndex, totalRules, rule.RuleName);
 
                             bool isSkip = false;
                             string srcPath = rule.SourceMode == "Preset" ? PresetList.FirstOrDefault(p => p.Id == rule.SourcePresetId)?.DirectoryPath : rule.SourceCustomPath;
@@ -580,21 +615,29 @@ namespace Classify8
 
                             if (isSkip)
                             {
-                                Dispatcher.Invoke(() => Log($"[エラー] ルール「{rule.RuleName}」: フォルダ設定が不明なためスキップ"));
+                                Dispatcher.Invoke(() => Log(Loc.F("log.folder_unknown", rule.RuleName)));
                                 Interlocked.Increment(ref totalErrorCount);
                                 continue;
                             }
 
                             if (!Directory.Exists(srcPath))
                             {
-                                Dispatcher.Invoke(() => Log($"[エラー] 振り分け元が存在しません: {srcPath}"));
+                                Dispatcher.Invoke(() => Log(Loc.F("log.source_missing", srcPath)));
+                                Interlocked.Increment(ref totalErrorCount);
+                                continue;
+                            }
+
+                            // ドライブ全体やシステムフォルダを対象にした振り分けは、安全のため実行しない
+                            if (PathSafety.IsDangerousSource(srcPath, rule.SearchSubDirectories, out string dangerReason))
+                            {
+                                Dispatcher.Invoke(() => Log(Loc.F("log.dangerous_source", rule.RuleName, dangerReason, srcPath)));
                                 Interlocked.Increment(ref totalErrorCount);
                                 continue;
                             }
 
                             // キャッシュのキーを作成
                             string cacheKey = $"{srcPath}|{rule.TargetType}|{rule.SearchSubDirectories}";
-                            List<string> itemsToProcess = new List<string>();
+                            List<FileSystemInfo> itemsToProcess = new List<FileSystemInfo>();
 
                             if (folderScanCache.ContainsKey(cacheKey))
                             {
@@ -604,11 +647,18 @@ namespace Classify8
                             {
                                 if (_progressWin != null)
                                 {
-                                    _progressWin.UpdateState(displayRuleName, "フォルダ内をスキャン中...", totalProcessedCount, totalErrorCount);
+                                    _progressWin.UpdateState(displayRuleName, Loc.T("progress.scanning"), totalProcessedCount, totalErrorCount);
                                 }
 
                                 // エラーが起きても絶対に止まらない独自スキャナーを使用する
-                                itemsToProcess = SafeGetItemsToProcess(srcPath, rule.SearchSubDirectories, rule.TargetType);
+                                var skippedDirs = new List<string>();
+                                itemsToProcess = SafeGetItemsToProcess(srcPath, rule.SearchSubDirectories, rule.TargetType, skippedDirs);
+
+                                if (skippedDirs.Count > 0)
+                                {
+                                    string sample = string.Join(", ", skippedDirs.Take(3));
+                                    Dispatcher.Invoke(() => Log(Loc.F("log.skipped_dirs", skippedDirs.Count, sample)));
+                                }
 
                                 folderScanCache[cacheKey] = itemsToProcess;
                             }
@@ -621,43 +671,49 @@ namespace Classify8
 
                             var affectedDestDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                            await Parallel.ForEachAsync(itemsToProcess, parallelOptions, async (itemPath, ct) =>
+                            await Parallel.ForEachAsync(itemsToProcess, parallelOptions, async (item, ct) =>
                             {
                                 try
                                 {
-                                    if (!File.Exists(itemPath) && !Directory.Exists(itemPath)) return;
+                                    // 列挙時に取得済みの情報(属性・サイズ・更新日時)を使うので、ここではディスクにアクセスしない
+                                    string itemPath = item.FullName;
+                                    string itemName = item.Name;
+                                    bool isDir = (item.Attributes & FileAttributes.Directory) == FileAttributes.Directory;
 
-                                    string itemName = Path.GetFileName(itemPath);
+                                    if (NgKeywordBuilder.IsExcluded(ngConditionNode, itemName)) return;
 
-                                    if (ngConditionNode != null && ngConditionNode.Evaluate(itemName)) return;
+                                    if (!rule.IsMatch(item)) return;
 
-                                    bool isDir = (File.GetAttributes(itemPath) & FileAttributes.Directory) == FileAttributes.Directory;
-                                    if (!rule.IsMatch(itemPath, isDir)) return;
-
-                                    var history = await processor.ProcessItemAsync(itemPath, destPath, rule, ct);
+                                    // (対象が既に存在しない場合は、ProcessItemAsync が null を返す)
+                                    var history = await processor.ProcessItemAsync(itemPath, destPath, rule, ct, isDir);
                                     if (history == null) return;
 
-                                    if (history.Status == "移動")
+                                    if (HistoryStatus.IsMoved(history.Status))
                                     {
                                         Interlocked.Increment(ref totalMovedCount);
                                         lock (affectedDestDirs) { affectedDestDirs.Add(history.DestDir); }
                                     }
-                                    else if (history.Status == "コピー")
+                                    else if (HistoryStatus.IsCopied(history.Status))
                                     {
                                         Interlocked.Increment(ref totalCopiedCount);
                                         lock (affectedDestDirs) { affectedDestDirs.Add(history.DestDir); }
                                     }
-                                    else if (history.Status.StartsWith("削除"))
+                                    else if (HistoryStatus.IsDeleted(history.Status))
                                     {
                                         Interlocked.Increment(ref totalDeletedCount);
                                     }
-                                    else if (history.Status == "エラー")
+                                    else if (HistoryStatus.IsError(history.Status))
                                     {
                                         Interlocked.Increment(ref totalErrorCount);
                                     }
+                                    else if (HistoryStatus.IsWarning(history.Status))
+                                    {
+                                        Interlocked.Increment(ref totalWarningCount);
+                                    }
 
-                                    // スキップされたものは履歴に残さない（「削除」は保存される）
-                                    if (!rule.DoNotSaveHistory && !history.Status.StartsWith("スキップ"))
+                                    // スキップ・警告は履歴に残さない（「削除」は保存される）
+                                    // (警告を残すと、定周期実行のたびに同じ記録が積み上がり、上限件数を埋めてしまうため)
+                                    if (!rule.DoNotSaveHistory && !HistoryStatus.IsSkipped(history.Status) && !HistoryStatus.IsWarning(history.Status))
                                     {
                                         historyRecords.Add(history);
                                     }
@@ -713,32 +769,54 @@ namespace Classify8
                     }
                     catch (OperationCanceledException)
                     {
-                        Dispatcher.Invoke(() => Log("[中止] ユーザーによって処理がキャンセルされました。"));
+                        Dispatcher.Invoke(() => Log(Loc.T("log.cancelled")));
                     }
                     catch (Exception ex)
                     {
-                        Dispatcher.Invoke(() => Log($"[致命的エラー] 処理が中断されました: {ex.Message}"));
+                        Dispatcher.Invoke(() => Log(Loc.F("log.fatal", ex.Message)));
                     }
                 });
 
                 progressBar.Value = 100;
-                txtStatus.Text = "待機中...";
+                txtStatus.Text = Loc.T("common.waiting");
 
-                if (historyRecords.Any()) HistoryManager.AddHistories(historyRecords.ToList(), CurrentSettings);
+                if (historyRecords.Any())
+                {
+                    try
+                    {
+                        HistoryManager.AddHistories(historyRecords.ToList(), CurrentSettings);
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLog.Error("Failed to save the history.", ex);
+                        Log(Loc.F("log.history_save_failed", ex.Message));
+                    }
+                }
+
+                if (totalWarningCount > 0)
+                {
+                    Log(Loc.F("log.same_location_warning", totalWarningCount));
+                }
 
                 if (!cts.IsCancellationRequested)
                 {
                     string endMessage = totalErrorCount > 0
-                        ? $"[終了] 処理完了（移動: {totalMovedCount}件, コピー: {totalCopiedCount}件, 削除: {totalDeletedCount}件, エラー: {totalErrorCount}件）"
-                        : $"[終了] すべての処理が正常に完了しました。（移動: {totalMovedCount}件, コピー: {totalCopiedCount}件, 削除: {totalDeletedCount}件）";
+                        ? Loc.F("log.finish_with_errors", totalMovedCount, totalCopiedCount, totalDeletedCount, totalErrorCount)
+                        : Loc.F("log.finish_ok", totalMovedCount, totalCopiedCount, totalDeletedCount);
                     Log(endMessage);
 
                     if (!isAutoExecution && totalErrorCount > 0)
                     {
-                        MessageBox.Show(this, $"{totalErrorCount}件のエラーが発生しました。\n詳細は画面下のログを確認してください。",
-                                        "一部処理に失敗しました", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        MessageBox.Show(this, Loc.F("msg.errors_occurred", totalErrorCount),
+                                        Loc.T("title.partial_fail"), MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                // async void から呼ばれることがあるため、ここで受け止めてアプリが落ちないようにする
+                AppLog.Error("An unexpected exception occurred during sorting.", ex);
+                Log(Loc.F("log.fatal", ex.Message));
             }
             finally
             {
@@ -753,47 +831,73 @@ namespace Classify8
                     _blinkTimer.Stop();
                     _isIconBlank = false;
                     _notifyIcon.Icon = _normalIcon;
-                    _notifyIcon.Text = "Classify8 - 待機中";
+                    _notifyIcon.Text = Loc.T("tray.idle");
                 }
 
                 this.IsEnabled = true;
-                lvRules.Items.Refresh();
+                RefreshRuleList();
                 _isSorting = false;
+                _currentCts = null;
+
+                // 処理中に終了を要求されていた場合は、履歴の保存など後始末が済んだここで閉じる
+                if (_exitRequested)
+                {
+                    // (戻り値は待たずに破棄する。ここで待つと、閉じる処理と自分自身が互いに待ち合ってしまう)
+                    _ = Dispatcher.BeginInvoke(new Action(() => Close()));
+                }
             }
         }
 
-        private List<string> SafeGetItemsToProcess(string rootPath, bool recurse, TargetType targetType)
+        private List<FileSystemInfo> SafeGetItemsToProcess(string rootPath, bool recurse, TargetType targetType, List<string> skippedDirs)
         {
-            var items = new List<string>();
+            var items = new List<FileSystemInfo>();
             var queue = new Queue<string>();
             queue.Enqueue(rootPath);
+
+            bool wantFiles = targetType == TargetType.FileOnly || targetType == TargetType.Both;
+            bool wantDirs = targetType == TargetType.DirectoryOnly || targetType == TargetType.Both;
+
+            // 属性・サイズ・更新日時は列挙と同時に取得されるので、後から1件ずつ問い合わせる必要がない。
+            // 隠し/システム属性のファイルも対象にする。
+            var options = new EnumerationOptions
+            {
+                AttributesToSkip = 0,
+                IgnoreInaccessible = false, // 開けないフォルダは例外にして、スキップした記録を残す
+                RecurseSubdirectories = false,
+                ReturnSpecialDirectories = false
+            };
 
             while (queue.Count > 0)
             {
                 string current = queue.Dequeue();
                 try
                 {
-                    if (targetType == TargetType.FileOnly || targetType == TargetType.Both)
+                    // 途中で例外になったフォルダの分は、中途半端に追加しない
+                    var found = new List<FileSystemInfo>();
+                    foreach (var info in new DirectoryInfo(current).EnumerateFileSystemInfos("*", options))
                     {
-                        items.AddRange(Directory.GetFiles(current));
+                        found.Add(info);
                     }
 
-                    var dirs = Directory.GetDirectories(current);
-
-                    if (targetType == TargetType.DirectoryOnly || targetType == TargetType.Both)
+                    foreach (var info in found)
                     {
-                        items.AddRange(dirs);
-                    }
-
-                    if (recurse)
-                    {
-                        // サブフォルダがある場合はキューに追加して後で検索する
-                        foreach (var d in dirs) queue.Enqueue(d);
+                        bool isDir = (info.Attributes & FileAttributes.Directory) == FileAttributes.Directory;
+                        if (isDir)
+                        {
+                            if (wantDirs) items.Add(info);
+                            // サブフォルダがある場合はキューに追加して後で検索する
+                            if (recurse) queue.Enqueue(info.FullName);
+                        }
+                        else if (wantFiles)
+                        {
+                            items.Add(info);
+                        }
                     }
                 }
                 catch
                 {
-                    // アクセス拒否やパス長超過などのエラーが出たフォルダは単にスキップして処理を継続する
+                    // アクセス拒否やパス長超過などのエラーが出たフォルダはスキップして処理を継続する(スキップした事実はログに出す)
+                    skippedDirs?.Add(current);
                 }
             }
             return items;
@@ -817,7 +921,7 @@ namespace Classify8
 
                 UpdateMenuState();
 
-                Log($"ルール「{_copyBuffer.RuleName}」をコピーしました。");
+                Log(Loc.F("log.copied_rule", _copyBuffer.RuleName));
             }
         }
 
@@ -827,14 +931,13 @@ namespace Classify8
             {
                 _copyBuffer = selected.Rule.Clone();
                 _isCutBuffer = true;
+                _cutSource = selected;
 
-                // リストから即座に削除する
-                RulesList.Remove(selected);
-                SaveAllRules();
-
+                // 貼り付けるまではリストから消さない
+                // (貼り付ける前にアプリを閉じても、ルールが失われないようにするため)
                 UpdateMenuState();
 
-                Log($"ルール「{_copyBuffer.RuleName}」を切り取りました。");
+                Log(Loc.F("log.cut_rule", _copyBuffer.RuleName));
             }
         }
 
@@ -842,18 +945,42 @@ namespace Classify8
         {
             if (_copyBuffer != null && lvRules.SelectedItem is SortRuleViewModel selected)
             {
+                // --- 切り取りからの貼り付け: 元のルール自体を移動する (IDも維持される) ---
+                if (_isCutBuffer && _cutSource != null && RulesList.Contains(_cutSource))
+                {
+                    var moving = _cutSource;
+
+                    // 一度切り取ったものを貼り付けた後は、通常コピーと同じ扱いにする
+                    _copyBuffer = moving.Rule.Clone();
+                    _isCutBuffer = false;
+                    _cutSource = null;
+
+                    if (!ReferenceEquals(moving, selected))
+                    {
+                        RulesList.Remove(moving);
+                        int movedIndex = RulesList.IndexOf(selected);
+                        RulesList.Insert(movedIndex, moving);
+                        SaveAllRules();
+                    }
+
+                    lvRules.SelectedItem = moving;
+                    UpdateMenuState();
+                    Log(Loc.T("log.moved_rule"));
+                    return;
+                }
+
+                // --- コピーからの貼り付け (切り取り元が既に削除されていた場合も含む) ---
                 int index = RulesList.IndexOf(selected);
                 var newRule = _copyBuffer.Clone();
 
-                // 切り取りからのペーストか、コピーからのペーストかで名前を変える
                 if (!_isCutBuffer)
                 {
-                    newRule.RuleName += " (コピー)";
+                    newRule.RuleName += Loc.T("rule.copy_suffix");
                 }
                 else
                 {
-                    // 一度切り取ったものを貼り付けた後は、通常コピーと同じ扱いにする
                     _isCutBuffer = false;
+                    _cutSource = null;
                 }
 
                 var newRuleVm = new SortRuleViewModel(newRule, PresetList);
@@ -864,21 +991,21 @@ namespace Classify8
                 lvRules.SelectedItem = newRuleVm;
 
                 SaveAllRules();
-                Log("ルールを貼り付けました。");
+                Log(Loc.T("log.pasted_rule"));
             }
         }
 
         private void MenuCheckAll_Click(object sender, RoutedEventArgs e)
         {
             foreach (var rule in RulesList) rule.IsEnabled = true;
-            lvRules.Items.Refresh(); // 画面にチェック状態を反映
+            RefreshRuleList(); // 画面にチェック状態を反映
             SaveAllRules();
         }
 
         private void MenuUncheckAll_Click(object sender, RoutedEventArgs e)
         {
             foreach (var rule in RulesList) rule.IsEnabled = false;
-            lvRules.Items.Refresh();
+            RefreshRuleList();
             SaveAllRules();
         }
 
@@ -929,14 +1056,8 @@ namespace Classify8
                 }
 
                 // 3. /NAME タグを実際のルール名に展開する
-                string safeRuleName = ruleName ?? "";
-                // (万が一ルール名にWindowsパスとして使えない文字が含まれていたらアンダーバーに置換)
-                foreach (char c in System.IO.Path.GetInvalidFileNameChars())
-                {
-                    safeRuleName = safeRuleName.Replace(c.ToString(), "_");
-                }
-
-                path = System.Text.RegularExpressions.Regex.Replace(path, "(?i)/NAME", safeRuleName);
+                // (実際の振り分け先の作成時と同じ規則で、使えない文字を _ に置換する)
+                path = path.Replace("/NAME", DynamicPathBuilder.SanitizeForPath(ruleName), StringComparison.OrdinalIgnoreCase);
 
                 // パス末尾の不要な空白やスラッシュを掃除する
                 path = path.TrimEnd(' ', '/');
@@ -960,24 +1081,8 @@ namespace Classify8
                 }
                 else
                 {
-                    MessageBox.Show(this, $"フォルダが存在しません:\n{path}", "エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(this, Loc.F("msg.folder_not_found", path), Loc.T("title.error"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
-            }
-        }
-
-
-        // 右クリック時に、クリックされた行だけを「単一行選択」にする
-        private void LvRules_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            var rowItem = GetRowItemFromOriginalSource(e.OriginalSource as DependencyObject);
-            if (rowItem != null)
-            {
-                lvRules.SelectedItems.Clear();
-                lvRules.SelectedItems.Add(rowItem);
-            }
-            else
-            {
-                lvRules.SelectedItems.Clear();
             }
         }
 
@@ -1010,7 +1115,7 @@ namespace Classify8
             }
             catch (Exception ex)
             {
-                Log($"[警告] プロセス優先度の変更に失敗しました: {ex.Message}");
+                Log(Loc.F("log.priority_failed", ex.Message));
             }
         }
 
@@ -1056,7 +1161,7 @@ namespace Classify8
                     }
 
                     // 画面の表示を更新して、他のチェックボックスの見た目も即座に切り替える
-                    lvRules.Items.Refresh();
+                    RefreshRuleList();
                 }
             }
 
@@ -1080,11 +1185,11 @@ namespace Classify8
                 _periodicTimer.Tick += PeriodicTimer_Tick;
                 _periodicTimer.Start();
 
-                Log($"[システム] 定周期実行が有効になりました（{CurrentSettings.PeriodicIntervalMinutes}分毎）。");
+                Log(Loc.F("log.periodic_enabled", CurrentSettings.PeriodicIntervalMinutes));
             }
             else
             {
-                Log("[システム] 定周期実行は無効です。");
+                Log(Loc.T("log.periodic_disabled"));
             }
         }
 
@@ -1095,11 +1200,11 @@ namespace Classify8
 
             if (this.IsVisible && this.WindowState != WindowState.Minimized)
             {
-                Log("[自動実行] 画面が表示中(操作中)のため、今回の定周期実行をスキップします。");
+                Log(Loc.T("log.periodic_skip"));
                 return;
             }
 
-            Log("[自動実行] 定周期実行の時間が来ました。処理を開始します。");
+            Log(Loc.T("log.periodic_start"));
             var targetRules = RulesList.ToList();
 
             // isAutoExecutionフラグを true にして呼び出す
@@ -1112,7 +1217,7 @@ namespace Classify8
         private void InitializeNotifyIcon()
         {
             _notifyIcon = new System.Windows.Forms.NotifyIcon();
-            _notifyIcon.Text = "Classify8 - 待機中";
+            _notifyIcon.Text = Loc.T("tray.idle");
 
             try
             {
@@ -1127,14 +1232,14 @@ namespace Classify8
             }
             catch (Exception ex)
             {
-                Log($"[警告] タスクトレイアイコンの読み込みに失敗しました: {ex.Message}");
+                Log(Loc.F("log.tray_icon_failed", ex.Message));
                 _normalIcon = System.Drawing.SystemIcons.Information;
+                _normalIconIsShared = true;
             }
 
             _notifyIcon.Icon = _normalIcon;
             _notifyIcon.Visible = true;
 
-            // 🚨追加: 透明アイコン(点滅用)をメモリ上に生成
             using (var bmp = new System.Drawing.Bitmap(16, 16))
             {
                 IntPtr hIcon = bmp.GetHicon();
@@ -1164,13 +1269,15 @@ namespace Classify8
             // 右クリックメニューの作成
             var contextMenu = new System.Windows.Forms.ContextMenuStrip();
 
-            var openItem = new System.Windows.Forms.ToolStripMenuItem("画面を表示(_O)");
+            var openItem = new System.Windows.Forms.ToolStripMenuItem(Loc.T("tray.show"));
+            _trayShowItem = openItem;
             openItem.Click += (s, e) => ShowMainWindow();
             contextMenu.Items.Add(openItem);
 
             contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
 
-            var exitItem = new System.Windows.Forms.ToolStripMenuItem("終了(_X)");
+            var exitItem = new System.Windows.Forms.ToolStripMenuItem(Loc.T("tray.exit"));
+            _trayExitItem = exitItem;
             exitItem.Click += (s, e) => MenuExit_Click(null, null);
             contextMenu.Items.Add(exitItem);
 
@@ -1213,12 +1320,50 @@ namespace Classify8
         // 閉じるボタン「×」が押された時、またはアプリが終了する直前の処理
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            // --- 完全に終了する ---
-            var rulesToSave = RulesList.Select(vm => vm.Rule).ToList();
-            DataManager.SaveRules(rulesToSave);
-            DataManager.SavePresets(PresetList);
+            // --- 振り分け処理の実行中に終了しようとした場合 ---
+            // そのまま閉じると、移動済みファイルの履歴が保存されないため、処理を中止して後始末が済んでから閉じる
+            if (_isSorting && !_sessionEnding)
+            {
+                if (!_exitRequested)
+                {
+                    string question = Loc.T("msg.confirm_exit_sorting");
+                    var answer = this.IsVisible
+                        ? MessageBox.Show(this, question, Loc.T("title.confirm"), MessageBoxButton.YesNo, MessageBoxImage.Warning)
+                        : MessageBox.Show(question, Loc.T("title.confirm"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
-            DataManager.SaveSettings(CurrentSettings);
+                    if (answer != MessageBoxResult.Yes)
+                    {
+                        e.Cancel = true;
+                        return;
+                    }
+
+                    _exitRequested = true;
+                    _currentCts?.Cancel();
+                }
+
+                // 処理の後始末が終わると、ExecuteSortingAsync の最後で自動的に閉じ直される
+                e.Cancel = true;
+                return;
+            }
+
+            // --- 完全に終了する ---
+            Loc.LanguageChanged -= OnLanguageChanged;
+
+            // 非同期の保存処理(SaveAllRules)が実行中なら、終わるのを待ってから保存する (同じファイルへの同時書き込みを避ける)
+            bool lockTaken = false;
+            try { lockTaken = _saveLock.Wait(3000); } catch { }
+            try
+            {
+                var rulesToSave = RulesList.Select(vm => vm.Rule).ToList();
+                DataManager.SaveRules(rulesToSave);
+                DataManager.SavePresets(PresetList);
+
+                DataManager.SaveSettings(CurrentSettings);
+            }
+            finally
+            {
+                if (lockTaken) _saveLock.Release();
+            }
 
             // タスクトレイのアイコンを綺麗に消去する
             if (_notifyIcon != null)
@@ -1232,25 +1377,10 @@ namespace Classify8
                 DestroyIcon(_blankIcon.Handle);
                 _blankIcon.Dispose();
             }
-            if (_normalIcon != null)
+            if (_normalIcon != null && !_normalIconIsShared)
             {
                 _normalIcon.Dispose();
             }
-        }
-
-
-        public void AddImportedRules(List<SortRule> importedRules)
-        {
-            foreach (var rule in importedRules)
-            {
-                RulesList.Add(new SortRuleViewModel(rule, PresetList));
-            }
-
-            // ファイルへ保存してUIに反映
-            SaveAllRules();
-            lvRules.Items.Refresh();
-
-            Log($"[インポート] ClassyNyから {importedRules.Count} 件のルールをインポートしました。");
         }
 
         public void ImportLegacyCsv(string filePath)
@@ -1258,11 +1388,11 @@ namespace Classify8
             try
             {
                 // PresetList を渡して、必要に応じてプリセットを追加させる
-                var importedRules = LegacyImporter.ImportFromClassyNyCsv(filePath, PresetList);
+                var importedRules = LegacyImporter.ImportFromClassiNyCsv(filePath, PresetList);
 
                 if (importedRules.Count == 0)
                 {
-                    MessageBox.Show(this, "インポートできるルールが見つかりませんでした。\nファイル形式が正しいか確認してください。", "お知らせ", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(this, Loc.T("msg.import_none"), Loc.T("title.info"), MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
@@ -1274,14 +1404,19 @@ namespace Classify8
                 // 新しく追加されたかもしれないプリセットと、ルールを保存
                 DataManager.SavePresets(PresetList);
                 SaveAllRules();
-                lvRules.Items.Refresh(); // 画面を更新
+                RefreshRuleList(); // 画面を更新
 
-                Log($"[インポート] ClassyNyから {importedRules.Count} 件のルールをインポートしました。");
-                MessageBox.Show(this, $"{importedRules.Count} 件のルールを正常にインポートしました！\n（※設定画面を閉じるとメイン画面に反映されます）", "インポート完了", MessageBoxButton.OK, MessageBoxImage.Information);
+                Log(Loc.F("log.import_done", importedRules.Count));
+                string note = "";
+                if (PresetList.Any(p => p.AliasName == LegacyImporter.CommonPresetAlias && string.IsNullOrWhiteSpace(p.DirectoryPath)))
+                {
+                    note = Loc.F("msg.import_preset_note", LegacyImporter.CommonPresetAlias);
+                }
+                MessageBox.Show(this, Loc.F("msg.import_success", importedRules.Count, note), Loc.T("title.import_done"), MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, $"インポート中にエラーが発生しました。\n{ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, Loc.F("msg.import_error", ex.Message), Loc.T("title.error"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1309,12 +1444,12 @@ namespace Classify8
                     RulesList.Insert(index, new SortRuleViewModel(window.ResultRule, PresetList));
                     SaveAllRules();
                     lvRules.SelectedIndex = index;
-                    Log($"ルール「{window.ResultRule.RuleName}」を更新しました。");
+                    Log(Loc.F("log.rule_updated", window.ResultRule.RuleName));
                 }
             }
             else
             {
-                MessageBox.Show($"振り分け条件「{ruleName}」が見つかりません。\nすでに削除された可能性があります。", "お知らせ", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(Loc.F("msg.rule_not_found", ruleName), Loc.T("title.info"), MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -1323,8 +1458,15 @@ namespace Classify8
         // ==========================================
         private void MenuHelp_Click(object sender, RoutedEventArgs e)
         {
-            // 実行ファイルと同じフォルダにある Help.md のパスを取得
-            string helpFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Help.html");
+            // 実行ファイルと同じフォルダにあるヘルプを開く
+            // 表示言語用のヘルプ (Help.en.html など) があればそれを、無ければ Help.html を開く
+            string helpFileName = $"Help.{Loc.CurrentLanguage}.html";
+            string helpFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, helpFileName);
+            if (!File.Exists(helpFilePath))
+            {
+                helpFileName = "Help.html";
+                helpFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, helpFileName);
+            }
 
             if (File.Exists(helpFilePath))
             {
@@ -1335,13 +1477,13 @@ namespace Classify8
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(this, $"ヘルプファイルの起動に失敗しました。\n{ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(this, Loc.F("msg.help_launch_failed", ex.Message), Loc.T("title.error"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
             else
             {
-                MessageBox.Show(this, "ヘルプファイル (Help.html) が見つかりません。\nアプリケーションと同じフォルダに配置されているか確認してください。",
-                                "ファイルが見つかりません", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, Loc.F("msg.help_not_found", helpFileName),
+                                Loc.T("title.file_not_found"), MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -1354,16 +1496,64 @@ namespace Classify8
             window.ShowDialog();
         }
 
+        // 表示言語が切り替わったとき。XAML の文字列は自動で切り替わるので、コードで設定している文字列を更新する
+        private void OnLanguageChanged(object sender, EventArgs e)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(() => OnLanguageChanged(sender, e)));
+                return;
+            }
+
+            if (_trayShowItem != null) _trayShowItem.Text = Loc.T("tray.show");
+            if (_trayExitItem != null) _trayExitItem.Text = Loc.T("tray.exit");
+            if (_notifyIcon != null) _notifyIcon.Text = Loc.T(_isSorting ? "tray.running" : "tray.idle");
+            if (!_isSorting) txtStatus.Text = Loc.T("common.waiting");
+
+            RefreshRuleList(); // 「移動/コピー」「不明なプリセット」などの表示を更新する
+        }
+
+        // ログ欄の行数上限 (タスクトレイに常駐し続けても、メモリや描画が重くならないようにする)
+        private const int MaxLogLines = 2000;
+        private const int LogTrimLines = 500;
+        private int _logLineCount = 0;
+
         private void Log(string message)
         {
             txtLog.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}\n");
-            txtLog.ScrollToEnd();
+            _logLineCount++;
+
+            if (_logLineCount > MaxLogLines)
+            {
+                // 古い行をまとめて切り捨てる
+                string text = txtLog.Text;
+                int cut = 0;
+                for (int i = 0; i < LogTrimLines; i++)
+                {
+                    int nl = text.IndexOf('\n', cut);
+                    if (nl < 0) break;
+                    cut = nl + 1;
+                }
+                txtLog.Text = text.Substring(cut);
+                _logLineCount -= LogTrimLines;
+            }
+
+            // 非表示(タスクトレイ格納中)のときは、スクロール処理は不要
+            if (this.IsVisible) txtLog.ScrollToEnd();
+        }
+
+        // ルール一覧の表示を更新する (プリセットの名称やパスが変わったとき等)
+        private void RefreshRuleList()
+        {
+            foreach (var vm in RulesList) vm.NotifyAll();
         }
     }
 
     // --- GUI表示用のViewModel ---
-    public class SortRuleViewModel
+    public class SortRuleViewModel : System.ComponentModel.INotifyPropertyChanged
     {
+        public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+
         public SortRule Rule { get; }
         private readonly IEnumerable<Preset> _presets;
 
@@ -1376,12 +1566,22 @@ namespace Classify8
         public bool IsEnabled
         {
             get => Rule.IsEnabled;
-            set => Rule.IsEnabled = value;
+            set
+            {
+                if (Rule.IsEnabled == value) return;
+                Rule.IsEnabled = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsEnabled)));
+            }
+        }
+
+        // すべてのプロパティの表示を更新させる (プリセットの変更など、間接的に表示が変わる場合に使う)
+        public void NotifyAll()
+        {
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(string.Empty));
         }
 
         public string RuleName => Rule.RuleName;
         public string SearchCondition => Rule.SearchCondition;
-        public string ActionText => Rule.IsMoveAction ? "移動" : "コピー";
 
         public string SourcePathDisplay
         {
@@ -1390,7 +1590,7 @@ namespace Classify8
                 if (Rule.SourceMode == "Preset")
                 {
                     var preset = _presets?.FirstOrDefault(p => p.Id == Rule.SourcePresetId);
-                    return preset != null ? $"[P] {preset.AliasName} ({preset.DirectoryPath})" : "[P] 不明なプリセット";
+                    return preset != null ? $"[P] {preset.AliasName} ({preset.DirectoryPath})" : Loc.T("rule.preset_unknown");
                 }
                 return Rule.SourceCustomPath;
             }
@@ -1403,7 +1603,7 @@ namespace Classify8
                 if (Rule.DestMode == "Preset")
                 {
                     var preset = _presets?.FirstOrDefault(p => p.Id == Rule.DestPresetId);
-                    return preset != null ? $"[P] {preset.AliasName} ({preset.DirectoryPath})" : "[P] 不明なプリセット";
+                    return preset != null ? $"[P] {preset.AliasName} ({preset.DirectoryPath})" : Loc.T("rule.preset_unknown");
                 }
                 return Rule.DestCustomPath;
             }

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Classify8 Help</title>
+    <style>
+        /* 全体のレイアウト設定 (左:固定幅, 右:可変幅でスクロール) */
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #333;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #fff;
+        }
+
+        /* サイドバー (左ペイン) */
+        .sidebar {
+            width: 260px;
+            background-color: #f8f9fa;
+            border-right: 1px solid #e1e4e8;
+            padding: 25px 0;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .sidebar h2 {
+            font-size: 14px;
+            text-transform: uppercase;
+            margin: 0 20px 10px;
+            color: #6a737d;
+            letter-spacing: 1px;
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 20px 0;
+        }
+
+        .sidebar li {
+            margin: 0;
+        }
+
+        .sidebar a {
+            display: block;
+            padding: 8px 20px;
+            color: #0366d6;
+            text-decoration: none;
+            font-size: 14px;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .sidebar a:hover {
+            background-color: #e1e4e8;
+            border-left: 3px solid #0366d6;
+            color: #000;
+        }
+
+        /* コンテンツ (右ペイン) */
+        .content {
+            flex: 1;
+            padding: 30px 50px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .content-inner {
+            max-width: 900px;
+            margin: 0 auto;
+            padding-bottom: 100px;
+        }
+
+        /* 見出し等のスタイル */
+        h1,
+        h2,
+        h3 {
+            color: #24292e;
+        }
+
+        h1 {
+            border-bottom: 2px solid #eaecef;
+            padding-bottom: 0.3em;
+            margin-top: 0;
+            font-size: 2em;
+            color: #1976D2;
+        }
+
+        h2 {
+            border-bottom: 1px solid #eaecef;
+            padding-bottom: 0.3em;
+            margin-top: 1.5em;
+            font-size: 1.5em;
+        }
+
+        h3 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+            margin-bottom: 0.5em;
+            color: #0366d6;
+        }
+
+        p,
+        li {
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        ul {
+            padding-left: 1.5em;
+        }
+
+        /* ジャンプした時のヘッダー被り防止 */
+        section {
+            scroll-margin-top: 30px;
+        }
+
+        /* テーブル (表) */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+
+        th,
+        td {
+            border: 1px solid #dfe2e5;
+            padding: 8px 13px;
+        }
+
+        th {
+            background-color: #f6f8fa;
+            text-align: left;
+        }
+
+        /* コードとキーボードキーの装飾 */
+        code {
+            background-color: #f3f4f6;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-family: SFMono-Regular, Consolas, monospace;
+            font-size: 90%;
+            color: #d32f2f;
+        }
+
+        kbd {
+            display: inline-block;
+            padding: 3px 5px;
+            font: 11px SFMono-Regular, Consolas, monospace;
+            line-height: 10px;
+            color: #444d56;
+            vertical-align: middle;
+            background-color: #fafbfc;
+            border: 1px solid #c6cbd1;
+            border-bottom-color: #959da5;
+            border-radius: 3px;
+            box-shadow: inset 0 -1px 0 #959da5;
+        }
+
+        .box {
+            background-color: #f1f8ff;
+            border-left: 4px solid #1976D2;
+            padding: 10px 15px;
+            margin: 15px 0;
+            font-size: 13px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 左ペイン (目次) -->
+    <nav class="sidebar">
+        <h2>Contents</h2>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#main-window">Main Window</a></li>
+            <li><a href="#rule-edit">Editing a Sort Rule</a></li>
+            <li><a href="#syntax">Search Conditions (Syntax)</a></li>
+            <li><a href="#tags">Automatic Folders (Tags)</a></li>
+            <li><a href="#presets">Preset Manager</a></li>
+            <li><a href="#history">Sort History</a></li>
+            <li><a href="#settings">Global Settings (Options)</a></li>
+        </ul>
+    </nav>
+
+    <!-- 右ペイン (コンテンツ) -->
+    <main class="content">
+        <div class="content-inner">
+
+            <h1>Classify8 Help</h1>
+            <p>Thank you for using Classify8.<br>This page explains how to use each window and how to write search conditions and tags. Click an item in the menu on the left to jump to it.</p>
+
+            <section id="overview">
+                <h2>Overview</h2>
+                <p><strong>Classify8</strong> is a sorting tool that automatically <strong>moves</strong> or <strong>copies</strong> files and folders, based on flexible conditions written in its own search syntax.<br>
+                    It can run periodically in the background from the notification area (system tray), and it safely checks for identical files and resolves conflicts when a file with the same name already exists.</p>
+                <div class="box">
+                    <strong>💡 Moving folders between drives</strong><br>
+                    When you move a whole folder to a different drive (for example, from drive C to drive D), the tool automatically switches to a safe method: it copies the contents first, and then deletes the original folder.
+                </div>
+            </section>
+
+            <section id="main-window">
+                <h2>Main Window</h2>
+                <p>In the dashboard (main window), you manage the list of sort rules and run them.</p>
+                <h3>Working with the list</h3>
+                <ul>
+                    <li><strong>Multiple selection</strong>: Hold <kbd>Ctrl</kbd> or <kbd>Shift</kbd> and click to select multiple rules.</li>
+                    <li><strong>Toggle several rules at once</strong>: With multiple rows selected, click any of their check boxes to enable or disable all selected rules at once.</li>
+                    <li><strong>Drag and drop</strong>: Drag a rule to change the order. (You can drag a row even if it is not selected. If multiple rows are selected, they are moved together.)</li>
+                    <li><strong>Right-click menu</strong>:
+                        Besides editing and copying rules, you can choose <strong>Open Source Folder</strong> / <strong>Open Destination Folder</strong>. (If the path contains tags, the nearest parent folder that can be resolved is opened.)</li>
+                </ul>
+                <h3>Keyboard shortcuts</h3>
+                <ul>
+                    <li><kbd>Ctrl</kbd> + <kbd>C</kbd> : Copies the selected rules.</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>X</kbd> : Cuts the selected rules. (They are moved to the new position when you paste them. Until then, they stay in the list.)</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>V</kbd> : Pastes the copied or cut rules <strong>above the currently selected row</strong>.</li>
+                    <li><kbd>Delete</kbd> : Deletes the selected rules.</li>
+                </ul>
+                <h3>Running rules</h3>
+                <ul>
+                    <li><strong>Double-click</strong>: Immediately runs <strong>only that one rule</strong>. (You can turn on a confirmation before it runs in the options.)</li>
+                    <li><strong>Run All Rules</strong>: Runs all enabled rules. When you run rules manually, a progress window is shown, and you can stop the process with <strong>Stop (Cancel)</strong>.</li>
+                </ul>
+            </section>
+
+            <section id="rule-edit">
+                <h2>Editing a Sort Rule</h2>
+                <p>Click <strong>+ Add Rule</strong> or <strong>Edit</strong> in the main window to open the rule editor.</p>
+                <h3>Main settings</h3>
+                <ul>
+                    <li><strong>Source / Destination</strong>: The folder to search for files, and the folder to move (or copy) them to. With <strong>Use a preset</strong>, you can manage frequently used folders in one place.
+                    </li>
+                    <li><strong>Copy mode</strong>: By default, files are moved (the original disappears). Check <strong>Copy instead of moving</strong> to keep the original and create a copy.</li>
+                    <li><strong>Search condition</strong>: Describes which files to pick up. (See the next section for the syntax.)</li>
+                </ul>
+                <h3>Option tabs</h3>
+                <ul>
+                    <li><strong>General</strong>: Whether to ignore differences in case, full-width/half-width characters, and hiragana/katakana, and whether to target files only, folders only, or both.
+                        <ul>
+                            <li><strong>Ignore full-width/half-width differences</strong> also treats other forms of the same character as identical, such as ligatures (<code>ﬁ</code> → <code>fi</code>), Roman numerals (<code>Ⅳ</code> → <code>IV</code>), and circled numbers (<code>①</code> → <code>1</code>), in addition to full-width/half-width letters, digits, and katakana.</li>
+                            <li>Characters that look the same but are stored differently, such as <code>é</code> as one character and <code>e</code> + an accent mark (common in file names created on a Mac), are always treated as identical, regardless of these options.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Size Filter</strong>: Excludes files of a specified size (Bytes / KB / MB) or larger, or of a specified size or smaller.</li>
+                    <li><strong>Date Filter</strong>: Excludes files based on their modification date, either by a specific date (on/before or on/after) or by a relative period such as "7 days ago or earlier".</li>
+                </ul>
+            </section>
+
+            <section id="syntax">
+                <h2>Search Conditions (Syntax)</h2>
+                <p>This syntax is used to match file names and folder names.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Operator</th>
+                            <th>Meaning</th>
+                            <th>Example</th>
+                            <th>Matches</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>*</code> <code>?</code></td>
+                            <td>Wildcards</td>
+                            <td><code>*.pdf</code></td>
+                            <td>All files with the .pdf extension</td>
+                        </tr>
+                        <tr>
+                            <td><strong><code>/&amp;</code></strong></td>
+                            <td>AND</td>
+                            <td><code>photo /&amp; latest</code></td>
+                            <td>Names that contain both "photo" and "latest"</td>
+                        </tr>
+                        <tr>
+                            <td><strong><code>/|</code></strong></td>
+                            <td>OR</td>
+                            <td><code>quote /| invoice</code></td>
+                            <td>Names that contain either "quote" or "invoice"</td>
+                        </tr>
+                        <tr>
+                            <td><strong><code>/!</code></strong></td>
+                            <td>NOT</td>
+                            <td><code>*.txt /&amp; /! discard</code></td>
+                            <td>.txt files whose names do not contain "discard"</td>
+                        </tr>
+                        <tr>
+                            <td><strong><code>/( )</code></strong></td>
+                            <td>Grouping</td>
+                            <td><code>/( A /| B /) /&amp; C</code></td>
+                            <td>Names that contain "A" or "B", and also contain "C"</td>
+                        </tr>
+                        <tr>
+                            <td><strong><code>" "</code></strong></td>
+                            <td>Words with spaces</td>
+                            <td><code>"MY DATA"</code></td>
+                            <td>Searches for "MY DATA" as a single keyword</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p>Note: If there is no operator between keywords, <code> /&amp; </code> (AND) is inserted automatically. Keywords separated by spaces are treated as separate keywords, so enclose a phrase that contains spaces in <code>" "</code>.</p>
+                <p>Note: A keyword matches if it appears anywhere in the file name (partial match).</p>
+                <p>Note: <code>*</code> matches zero or more characters, and <code>?</code> matches exactly one character. <code>?</code> counts emoji, flags, accented letters, and rare kanji such as "𠮷" as one visible character each.</p>
+                <p>Note: The <strong>Ignore full-width/half-width differences</strong> and <strong>Ignore hiragana/katakana differences</strong> options on the General tab also apply to search conditions.</p>
+                <p>Note: If a condition is written incorrectly (for example, a missing closing parenthesis), you are notified with an error when you save the rule.</p>
+            </section>
+
+            <section id="tags">
+                <h2>Automatic Folders (Dynamic Tags)</h2>
+                <p>If you include the following tags in the source or destination folder path, folders are created automatically to match the date and time of the run. (Tags are case-insensitive.)</p>
+                <ul>
+                    <li><strong>/YYYY</strong> or <strong>/YY</strong> : Year of the run (e.g. 2026, 26)</li>
+                    <li><strong>/MM</strong> : Month of the run (e.g. 09)</li>
+                    <li><strong>/DD</strong> : Day of the run (e.g. 15)</li>
+                    <li><strong>/NAME</strong> : The rule name entered in the rule editor</li>
+                    <li><strong>/COND</strong> : The search condition text (the <code>/</code> character, which cannot be used in paths, is removed automatically)</li>
+                </ul>
+                <div class="box">
+                    <strong>▼ Tags available only in the destination</strong><br>
+                    These tags read the actual modification date of each file and sort by it.<br>
+                    You can use <strong>/FYYYY</strong> (year), <strong>/FMM</strong> (month), and <strong>/FDD</strong> (day).
+                </div>
+            </section>
+
+            <section id="presets">
+                <h2>Preset Manager</h2>
+                <p>You can register frequently used folder paths under a name (alias), such as "Main Photos Folder". When you change the path of a preset, the change immediately applies to every rule that uses it.</p>
+                <p>Note: If you try to delete a preset that is in use, a safeguard lets you choose either to convert the rules to use the folder path directly (keeping the rules working) or to force the deletion.</p>
+            </section>
+
+            <section id="history">
+                <h2>Sort History</h2>
+                <p>Choose <code>[Sort] &gt; [Sort History]</code> from the menu to see a list of past results.<br>
+                    <strong>Right-click</strong> a row in the history to do the following:</p>
+                <ul>
+                    <li><strong>Open Source Folder / Open Destination Folder</strong>: Opens File Explorer with the target file already selected and highlighted.</li>
+                    <li><strong>Open Rule</strong>: Jumps directly to the editor of that rule.</li>
+                </ul>
+            </section>
+
+            <section id="settings">
+                <h2>Global Settings (Options)</h2>
+                <p>Choose <code>[Options] &gt; [Settings]</code> from the menu to change how the whole application behaves.</p>
+                <h3>Name Conflicts</h3>
+                <p>Decides what to do when a file with the same name already exists in the destination, separately for when the sizes are the same and when they are different. (As a safety feature, a file is treated as identical even if its name differs only by a number such as <code>(1)</code>, as long as the size matches and the timestamps differ by 2 seconds or less. Such files are quickly skipped or cleaned up.)</p>
+                <p>In addition, if you turn on <strong>If the sizes match but only the timestamps differ, compare the contents to check whether the files are identical</strong>, files with exactly the same content are also treated as duplicates (on by default). When the contents are the same, this takes precedence over the same-name handling above. This may take time for large files or slow drives.</p>
+
+                <h3>Exclusions (global)</h3>
+                <p>You can list files that should be ignored by the whole application (such as system files), one per line. The lines are combined with OR, and wildcards are available. Each line is treated as a single keyword, and spaces in a line are matched as they are.</p>
+                <p>Note: Exclusion keywords ignore case. Differences such as full-width/half-width, hiragana/katakana, ligatures, and Roman numerals are not ignored (the General options of rules do not apply here). Characters that differ only in how they are stored, such as <code>é</code> and <code>e</code> + an accent mark, are treated as identical.</p>
+
+                <h3>Execution</h3>
+                <p>When periodic execution is on, sorting runs automatically in the background at the specified interval (in minutes) while the application is minimized to the notification area.</p>
+
+                <h3>Priority</h3>
+                <p>Sets the priority of Classify8 (the Windows process priority). It decides whether Classify8 or other applications get preference when the CPU is busy. The setting takes effect as soon as you save.</p>
+                <ul>
+                    <li><strong>High</strong>: Processes as fast as possible, ahead of other applications. Other applications may slow down while sorting is in progress.</li>
+                    <li><strong>Normal</strong> (default): The standard Windows priority.</li>
+                    <li><strong>Low</strong>: Gives preference to other applications. Recommended, for example, when periodic execution sorts many files while you are working.</li>
+                    <li><strong>Idle</strong>: Processes only when the PC is not busy with anything else. Sorting may take longer when the PC is busy.</li>
+                </ul>
+                <p>Note: The priority applies to the whole application, so with Low or Idle, the Classify8 windows may also respond more slowly while the PC is busy.</p>
+                <p>Note: This setting mainly affects how CPU time is allocated. If most of the time is spent reading and writing files, changing the priority may not make much difference in speed.</p>
+
+                <h3>Display (Language)</h3>
+                <p>Selects the language used in windows and messages. The change takes effect as soon as you save (no restart is needed).</p>
+                <ul>
+                    <li><strong>Auto (follow the OS language)</strong> (default): Uses the Windows display language. If that language is not available, English is used.</li>
+                    <li><strong>日本語 / English</strong>: The languages built into the application.</li>
+                    <li>Languages you add to the Languages folder also appear in the list.</li>
+                </ul>
+                <p>Note: The help (this page) also opens in the selected language. If no help is available in that language, the Japanese help opens.</p>
+                <div class="box">
+                    <strong>💡 Adding a language</strong><br>
+                    Put a language file based on <code>_template.json</code> (for example, <code>fr.json</code>) in the <code>Languages</code> folder next to Classify8.exe, and then restart the application. For details, see <code>README.txt</code> in the same folder.
+                </div>
+
+                <h3>Safety features</h3>
+                <ul>
+                    <li>A drive root searched together with its subfolders, and folders under Windows or Program Files, cannot be used as a source.</li>
+                    <li>If you try to exit the application while sorting is in progress, it asks for confirmation, stops the process, saves the history, and then exits.</li>
+                    <li>Settings, rules, and history are saved in the same folder as the executable (or in <code>%AppData%\Classify8</code> if that folder is not writable). Unexpected errors are recorded in <code>error.log</code>.</li>
+                </ul>
+            </section>
+        </div>
+    </main>
+
+</body>
+
+</html>

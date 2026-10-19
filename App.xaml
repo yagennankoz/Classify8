@@ -1,19 +1,20 @@
 <Application x:Class="Classify8.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:Classify8.Localization"
              StartupUri="MainWindow.xaml">
      <Application.Resources>
 
           <!-- スペルチェック候補などを出さない、シンプルな右クリックメニュー -->
           <ContextMenu x:Key="PlainTextBoxMenu">
-               <MenuItem Header="切り取り(_T)"
+               <MenuItem Header="{loc:Tr textmenu.cut}"
                          Command="ApplicationCommands.Cut"/>
-               <MenuItem Header="コピー(_C)"
+               <MenuItem Header="{loc:Tr textmenu.copy}"
                          Command="ApplicationCommands.Copy"/>
-               <MenuItem Header="貼り付け(_P)"
+               <MenuItem Header="{loc:Tr textmenu.paste}"
                          Command="ApplicationCommands.Paste"/>
                <Separator/>
-               <MenuItem Header="すべて選択(_A)"
+               <MenuItem Header="{loc:Tr textmenu.select_all}"
                          Command="ApplicationCommands.SelectAll"/>
           </ContextMenu>
 

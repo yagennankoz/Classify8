@@ -14,6 +14,9 @@ namespace Classify8.Core
 
     public class AppSettings
     {
+        // --- 0. 表示言語 ("auto" = OSの言語に合わせる。または言語コード: ja, en など) ---
+        public string Language { get; set; } = "auto";
+
         // --- 1. 同名ファイルの処理 ---
         public ConflictResolution SameSizeResolution { get; set; } = ConflictResolution.Rename;
         public ConflictResolution DiffSizeResolution { get; set; } = ConflictResolution.Rename;
@@ -21,7 +24,7 @@ namespace Classify8.Core
         // サイズが同じでタイムスタンプだけ異なる場合に、内容(バイト列)を比較して同一ファイルか判定する
         public bool CompareContentWhenTimestampDiffers { get; set; } = true;
 
-        // 内容比較を行う上限サイズ(MB)。0 = 無制限。上限を超えるファイルは内容比較せず従来どおり判定する
+        // 内容比較を行う上限サイズ(MB)。0 = 無制限。上限を超えるファイルは内容比較せず、サイズと更新日時だけで判定する
         public int ContentCompareMaxSizeMB { get; set; } = 0;
 
         // --- 2. 振り分けないファイル ---
@@ -35,6 +38,9 @@ namespace Classify8.Core
         public bool AutoCreateDestFolder { get; set; } = true;
         public bool StartMinimized { get; set; } = false;
         public bool SilentReadOnly { get; set; } = true;
+
+        // ルールのダブルクリックで即実行する前に、確認ダイアログを表示する
+        public bool ConfirmBeforeDoubleClickRun { get; set; } = false;
         
         public bool LimitHistoryCount { get; set; } = true;
         public int HistoryLimitHundreds { get; set; } = 10; // デフォルト10(百件) = 1000件

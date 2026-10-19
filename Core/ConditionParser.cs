@@ -1,9 +1,17 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
+using System.Text;
 
 namespace Classify8.Core
 {
+    /// <summary>
+    /// 検索条件の構文:
+    ///   *  ?        ワイルドカード
+    ///   空白         キーワード間は暗黙の AND
+    ///   /&amp;  /|  /!   AND / OR / NOT
+    ///   /(  /)      グループ化
+    ///   " "         空白や演算子を含むキーワードを囲む (例: "PURPLE SKY")
+    /// </summary>
     public class ConditionParser
     {
         private enum TokenType { And, Or, Not, LParen, RParen, Term, EOF }
@@ -14,61 +22,118 @@ namespace Classify8.Core
         }
 
         private readonly bool _ignoreCase;
+        private readonly bool _ignoreWidth;
+        private readonly bool _ignoreKana;
 
-        public ConditionParser(bool ignoreCase = true)
+        public ConditionParser(bool ignoreCase = true, bool ignoreWidth = false, bool ignoreKana = false)
         {
             _ignoreCase = ignoreCase;
+            _ignoreWidth = ignoreWidth;
+            _ignoreKana = ignoreKana;
         }
 
+        /// <exception cref="FormatException">構文エラー</exception>
         public IConditionNode Parse(string input)
         {
             if (string.IsNullOrWhiteSpace(input)) return new TermNode("*", _ignoreCase); // 空ならすべて一致
 
             var tokens = Tokenize(input);
             int pos = 0;
-            return ParseExpression(tokens, ref pos);
+            var node = ParseExpression(tokens, ref pos);
+
+            // 式の途中で解析が止まっている場合は、黙って無視せずエラーにする
+            if (tokens[pos].Type != TokenType.EOF)
+            {
+                if (tokens[pos].Type == TokenType.RParen)
+                    throw new FormatException(Loc.T("parser.err.missing_open_paren"));
+                throw new FormatException(Loc.T("parser.err.trailing"));
+            }
+            return node;
         }
 
-        // 文字列をトークンに分解し、暗黙のANDを補完する
+        private Token MakeTerm(string raw)
+        {
+            return new Token
+            {
+                Type = TokenType.Term,
+                Value = TextNormalizer.Normalize(raw, _ignoreWidth, _ignoreKana)
+            };
+        }
+
+        // 文字列を1文字ずつ読んでトークンに分解し、暗黙のANDを補完する
         private List<Token> Tokenize(string input)
         {
             var tokens = new List<Token>();
-            // 演算子で分割（デリミタも残す）
-            var parts = Regex.Split(input, @"(/\&|/\||/\!|/\(|/\))");
+            var current = new StringBuilder();
 
-            foreach (var part in parts)
+            void Flush()
             {
-                if (string.IsNullOrWhiteSpace(part)) continue;
-
-                switch (part)
+                if (current.Length > 0)
                 {
-                    case "/&": tokens.Add(new Token { Type = TokenType.And }); break;
-                    case "/|": tokens.Add(new Token { Type = TokenType.Or }); break;
-                    case "/!": tokens.Add(new Token { Type = TokenType.Not }); break;
-                    case "/(": tokens.Add(new Token { Type = TokenType.LParen }); break;
-                    case "/)": tokens.Add(new Token { Type = TokenType.RParen }); break;
-                    default:
-                        string val = part.Trim();
-                        if (val.StartsWith("\"") && val.EndsWith("\"") && val.Length >= 2)
-                        {
-                            val = val.Substring(1, val.Length - 2);
-                        }
-                        if (!string.IsNullOrEmpty(val))
-                        {
-                            tokens.Add(new Token { Type = TokenType.Term, Value = val });
-                        }
-                        break;
+                    tokens.Add(MakeTerm(current.ToString()));
+                    current.Clear();
                 }
             }
 
+            int i = 0;
+            while (i < input.Length)
+            {
+                char c = input[i];
+
+                // 演算子 (/& /| /! /( /))。語の途中でも区切りとして扱う
+                if (c == '/' && i + 1 < input.Length)
+                {
+                    TokenType? op = null;
+                    switch (input[i + 1])
+                    {
+                        case '&': op = TokenType.And; break;
+                        case '|': op = TokenType.Or; break;
+                        case '!': op = TokenType.Not; break;
+                        case '(': op = TokenType.LParen; break;
+                        case ')': op = TokenType.RParen; break;
+                    }
+                    if (op.HasValue)
+                    {
+                        Flush();
+                        tokens.Add(new Token { Type = op.Value });
+                        i += 2;
+                        continue;
+                    }
+                }
+
+                // 空白(全角含む)は語の区切り
+                if (char.IsWhiteSpace(c))
+                {
+                    Flush();
+                    i++;
+                    continue;
+                }
+
+                // 引用符: 語の先頭にあるときだけ、次の " までを1つの語として読む
+                if (c == '"' && current.Length == 0)
+                {
+                    int end = input.IndexOf('"', i + 1);
+                    if (end < 0) throw new FormatException(Loc.T("parser.err.unclosed_quote"));
+
+                    string quoted = input.Substring(i + 1, end - i - 1);
+                    if (quoted.Length > 0) tokens.Add(MakeTerm(quoted));
+                    i = end + 1;
+                    continue;
+                }
+
+                current.Append(c);
+                i++;
+            }
+            Flush();
+
             // 暗黙のANDの補完 (例: [Term] [Term] の間に [And] を挟む)
             var finalTokens = new List<Token>();
-            for (int i = 0; i < tokens.Count; i++)
+            for (int k = 0; k < tokens.Count; k++)
             {
-                if (i > 0)
+                if (k > 0)
                 {
-                    var prev = tokens[i - 1].Type;
-                    var curr = tokens[i].Type;
+                    var prev = tokens[k - 1].Type;
+                    var curr = tokens[k].Type;
 
                     bool needsAnd =
                         (prev == TokenType.Term && curr == TokenType.Term) ||
@@ -83,7 +148,7 @@ namespace Classify8.Core
                         finalTokens.Add(new Token { Type = TokenType.And });
                     }
                 }
-                finalTokens.Add(tokens[i]);
+                finalTokens.Add(tokens[k]);
             }
             finalTokens.Add(new Token { Type = TokenType.EOF });
             return finalTokens;
@@ -126,7 +191,9 @@ namespace Classify8.Core
             {
                 pos++;
                 var node = ParseExpression(tokens, ref pos);
-                if (tokens[pos].Type == TokenType.RParen) pos++; // 閉じ括弧をスキップ
+                if (tokens[pos].Type != TokenType.RParen)
+                    throw new FormatException(Loc.T("parser.err.missing_close_paren"));
+                pos++;
                 return node;
             }
             if (token.Type == TokenType.Term)
@@ -134,7 +201,10 @@ namespace Classify8.Core
                 pos++;
                 return new TermNode(token.Value, _ignoreCase);
             }
-            throw new Exception("構文エラー: 予期しないトークンです。");
+
+            if (token.Type == TokenType.EOF)
+                throw new FormatException(Loc.T("parser.err.unexpected_end"));
+            throw new FormatException(Loc.T("parser.err.misplaced"));
         }
     }
 }

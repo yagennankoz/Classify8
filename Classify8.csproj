@@ -21,7 +21,17 @@
     <Resource Include="c8_icon.ico" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="Help.html">
+    <None Update="Help*.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- 画面・メッセージの文字列(言語ファイル)。アプリに埋め込む -->
+    <EmbeddedResource Include="Resources\Lang\*.json" LogicalName="Classify8.Lang.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- 言語を追加するためのフォルダ(ひな形と説明)。実行ファイルの隣にコピーする -->
+    <None Update="Languages\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

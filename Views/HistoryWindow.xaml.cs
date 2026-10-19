@@ -70,7 +70,7 @@ namespace Classify8.Views
             }
             else
             {
-                // 万が一APIの呼び出しに失敗した場合は、従来のコマンドラインで開く
+                // 万が一APIの呼び出しに失敗した場合は、explorer.exe のコマンドラインで開く
                 Process.Start("explorer.exe", $"/select,\"{filePath}\"");
             }
         }

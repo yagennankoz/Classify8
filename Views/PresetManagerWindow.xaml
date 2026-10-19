@@ -1,7 +1,8 @@
 <Window x:Class="Classify8.Views.PresetManagerWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="プリセット管理"
+        xmlns:loc="clr-namespace:Classify8.Localization"
+        Title="{loc:Tr presets.title}"
         Height="350"
         Width="600"
         WindowStartupLocation="CenterOwner"
@@ -25,10 +26,10 @@
                     SelectionChanged="LvPresets_SelectionChanged">
                 <ListView.View>
                     <GridView>
-                        <GridViewColumn Header="名称"
+                        <GridViewColumn Header="{loc:Tr common.name}"
                                 DisplayMemberBinding="{Binding AliasName}"
                                 Width="100"/>
-                        <GridViewColumn Header="パス"
+                        <GridViewColumn Header="{loc:Tr presets.col.path}"
                                 DisplayMemberBinding="{Binding DirectoryPath}"
                                 Width="120"/>
                     </GridView>
@@ -40,14 +41,14 @@
                     Margin="0,10,0,0"
                     HorizontalAlignment="Center">
                 <Button Name="btnAdd"
-                        Content="＋ 新規追加"
-                        Width="80"
+                        Content="{loc:Tr presets.btn.add}"
+                        MinWidth="80" Padding="8,0"
                         Height="25"
                         Margin="0,0,10,0"
                         Click="BtnAdd_Click"/>
                 <Button Name="btnDelete"
-                        Content="削除"
-                        Width="60"
+                        Content="{loc:Tr common.delete}"
+                        MinWidth="60" Padding="8,0"
                         Height="25"
                         Click="BtnDelete_Click"/>
             </StackPanel>
@@ -65,7 +66,7 @@
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0"
-                    Text="エイリアス名称 (設定名):"
+                    Text="{loc:Tr presets.label.alias}"
                     FontWeight="Bold"
                     Margin="0,0,0,5"/>
             <TextBox Grid.Row="1"
@@ -75,7 +76,7 @@
                     TextChanged="Txt_TextChanged"/>
 
             <TextBlock Grid.Row="2"
-                    Text="実フォルダパス:"
+                    Text="{loc:Tr presets.label.path}"
                     FontWeight="Bold"
                     Margin="0,0,0,5"/>
             <Grid Grid.Row="3"
@@ -93,22 +94,22 @@
                         <ToolTip>
                             <TextBlock>
                                 <Run FontWeight="Bold"
-                                        Text="【パスに使える自動挿入タグ】"/><LineBreak/>
-                                <Run Text="/YYYY, /YY : 実行年 (4桁, 2桁)"/><LineBreak/>
-                                <Run Text="/MM : 実行月    /DD : 実行日"/><LineBreak/>
-                                <Run Text="/NAME : 設定名 (振り分け条件名)"/><LineBreak/>
-                                <Run Text="/COND : 検索条件 (スラッシュは除外)"/><LineBreak/>
+                                        Text="{loc:Tr tags.title}"/><LineBreak/>
+                                <Run Text="{loc:Tr tags.year}"/><LineBreak/>
+                                <Run Text="{loc:Tr tags.month_day}"/><LineBreak/>
+                                <Run Text="{loc:Tr tags.name}"/><LineBreak/>
+                                <Run Text="{loc:Tr tags.cond}"/><LineBreak/>
                                 <Run Foreground="Gray"
-                                        Text="※大文字・小文字どちらでも使用可能"/><LineBreak/>
+                                        Text="{loc:Tr tags.case}"/><LineBreak/>
                                 <Run Foreground="#D32F2F"
-                                        Text="※ファイルの更新日時(/FYY等)は『振り分け先』でのみ使用可能です"/>
+                                        Text="{loc:Tr presets.tags.file_note}"/>
                             </TextBlock>
                         </ToolTip>
                     </TextBox.ToolTip>
                 </TextBox>
                 <Button Grid.Column="1"
-                        Content="参照..."
-                        Width="60"
+                        Content="{loc:Tr common.browse}"
+                        MinWidth="60" Padding="8,0"
                         Height="25"
                         Click="BtnBrowse_Click"/>
             </Grid>
@@ -117,8 +118,8 @@
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">
                 <Button Name="btnSave"
-                        Content="保存して閉じる"
-                        Width="100"
+                        Content="{loc:Tr common.save_close}"
+                        MinWidth="100" Padding="8,0"
                         Height="30"
                         Margin="0,0,10,0"
                         Background="#FF4CAF50"
@@ -126,8 +127,8 @@
                         FontWeight="Bold"
                         Click="BtnSave_Click"/>
                 <Button Name="btnCancel"
-                        Content="キャンセル"
-                        Width="80"
+                        Content="{loc:Tr common.cancel}"
+                        MinWidth="80" Padding="8,0"
                         Height="30"
                         Click="BtnCancel_Click"/>
             </StackPanel>

@@ -8,7 +8,10 @@ namespace Classify8.Core
 {
     public static class LegacyImporter
     {
-        public static List<SortRule> ImportFromClassyNyCsv(string filePath, IList<Preset> presets)
+        /// <summary>ClassiNy の「共通」振り分け元を取り込む際に作るプリセットの別名</summary>
+        public const string CommonPresetAlias = "ClassiNy共通振り分け元";
+
+        public static List<SortRule> ImportFromClassiNyCsv(string filePath, IList<Preset> presets)
         {
             var rules = new List<SortRule>();
 
@@ -31,12 +34,17 @@ namespace Classify8.Core
 
                 if (cols[2] == "0")
                 {
-                    var targetPreset = presets.FirstOrDefault(p => p.AliasName == "ClassiNy共通振り分け元");
+                    var targetPreset = presets.FirstOrDefault(p => p.AliasName == CommonPresetAlias);
                     if (targetPreset == null)
                     {
-                        targetPreset = new Preset { AliasName = "ClassiNy共通振り分け元", DirectoryPath = @"C:\" };
+                        // パスは利用者が設定するまで空にしておく (C:\ などを仮置きすると、ドライブ全体が振り分け元になってしまうため)
+                        targetPreset = new Preset { AliasName = CommonPresetAlias, DirectoryPath = "" };
                         presets.Add(targetPreset);
                     }
+
+                    // 振り分け元のパスが未設定のプリセットを使うルールは、設定が済むまで無効にしておく
+                    if (string.IsNullOrWhiteSpace(targetPreset.DirectoryPath)) rule.IsEnabled = false;
+
                     rule.SourceMode = "Preset";
                     rule.SourcePresetId = targetPreset.Id;
                     rule.SourceCustomPath = "";

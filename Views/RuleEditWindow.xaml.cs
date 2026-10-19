@@ -1,5 +1,7 @@
+using System;
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Controls;
 using Microsoft.Win32;
 using Classify8.Core;
 
@@ -16,7 +18,10 @@ namespace Classify8.Views
             cmbSourcePreset.ItemsSource = presets;
             cmbDestPreset.ItemsSource = presets;
 
+            // Clone() は新しいIDを発行するが、編集では元のルールと同一とみなす
+            // (IDが変わると、履歴の RuleId とのひも付けが切れてしまうため)
             ResultRule = rule.Clone();
+            ResultRule.Id = rule.Id;
             LoadDataToUI();
         }
 
@@ -145,13 +150,13 @@ namespace Classify8.Views
 
         private void BtnSourceBrowse_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new OpenFolderDialog { Title = "振り分け元フォルダの選択" };
+            var dialog = new OpenFolderDialog { Title = Loc.T("dialog.select_source") };
             if (dialog.ShowDialog() == true) txtSourceCustom.Text = dialog.FolderName;
         }
 
         private void BtnDestBrowse_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new OpenFolderDialog { Title = "振り分け先フォルダの選択" };
+            var dialog = new OpenFolderDialog { Title = Loc.T("dialog.select_dest") };
             if (dialog.ShowDialog() == true) txtDestCustom.Text = dialog.FolderName;
         }
 
@@ -159,29 +164,92 @@ namespace Classify8.Views
         {
             if (rbSourcePreset.IsChecked == true && cmbSourcePreset.SelectedValue == null)
             {
-                MessageBox.Show("振り分け元のプリセットが選択されていません。", "入力エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, Loc.T("msg.source_preset_missing"), Loc.T("title.input_error"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             if (rbSourceCustom.IsChecked == true && string.IsNullOrWhiteSpace(txtSourceCustom.Text))
             {
-                MessageBox.Show("振り分け元のフォルダパスを入力してください。", "入力エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, Loc.T("msg.source_path_missing"), Loc.T("title.input_error"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (rbDestPreset.IsChecked == true && cmbDestPreset.SelectedValue == null)
             {
-                MessageBox.Show("振り分け先のプリセットが選択されていません。", "入力エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, Loc.T("msg.dest_preset_missing"), Loc.T("title.input_error"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             if (rbDestCustom.IsChecked == true && string.IsNullOrWhiteSpace(txtDestCustom.Text))
             {
-                MessageBox.Show("振り分け先のフォルダパスを入力してください。", "入力エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, Loc.T("msg.dest_path_missing"), Loc.T("title.input_error"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             // --------------------------------------------------------
 
+            if (string.IsNullOrWhiteSpace(txtRuleName.Text))
+            {
+                MessageBox.Show(this, Loc.T("msg.rule_name_empty"), Loc.T("title.input_error"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtRuleName.Focus();
+                return;
+            }
+
+            // 検索条件の構文チェック (実行して初めてエラーになるのを防ぐ)
+            try
+            {
+                new ConditionParser(ignoreCase: true).Parse(txtSearchCondition.Text);
+            }
+            catch (FormatException ex)
+            {
+                MessageBox.Show(this, ex.Message, Loc.T("title.syntax_error"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtSearchCondition.Focus();
+                return;
+            }
+
+            // 数値の入力チェック (有効にしている項目のみ)
+            if (!ValidateNumber(chkSizeMinEnabled, txtSizeMinValue, Loc.T("validate.size_min"), true)) return;
+            if (!ValidateNumber(chkSizeMaxEnabled, txtSizeMaxValue, Loc.T("validate.size_max"), true)) return;
+            if (!ValidateNumber(chkTimeBeforeEnabled, txtTimeBeforeValue, Loc.T("validate.time_before"), false)) return;
+            if (!ValidateNumber(chkTimeAfterEnabled, txtTimeAfterValue, Loc.T("validate.time_after"), false)) return;
+
             SaveDataFromUI();
+
+            // 危険な振り分け元 (ドライブ全体・システムフォルダ) は登録できないようにする
+            string sourcePath = ResultRule.SourceMode == "Preset"
+                ? (cmbSourcePreset.SelectedItem as Preset)?.DirectoryPath
+                : ResultRule.SourceCustomPath;
+            if (!string.IsNullOrWhiteSpace(sourcePath))
+            {
+                string expanded = DynamicPathBuilder.BuildPath(sourcePath, "", ResultRule);
+                if (PathSafety.IsDangerousSource(expanded, ResultRule.SearchSubDirectories, out string reason))
+                {
+                    MessageBox.Show(this, Loc.F("msg.dangerous_source", reason, expanded), Loc.T("title.input_error"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
+
             DialogResult = true;
+        }
+
+        // 有効にされている数値項目が、0以上の数値になっているか確認する
+        private bool ValidateNumber(CheckBox enabled, TextBox box, string label, bool allowDecimal)
+        {
+            if (enabled.IsChecked != true) return true;
+
+            bool ok;
+            if (allowDecimal)
+            {
+                ok = double.TryParse(box.Text, out double d) && d >= 0;
+            }
+            else
+            {
+                ok = int.TryParse(box.Text, out int n) && n >= 0;
+            }
+
+            if (!ok)
+            {
+                MessageBox.Show(this, Loc.F(allowDecimal ? "msg.number_invalid_decimal" : "msg.number_invalid_integer", label), Loc.T("title.input_error"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                box.Focus();
+            }
+            return ok;
         }
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e)

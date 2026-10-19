@@ -1,7 +1,8 @@
 <Window x:Class="Classify8.Views.HistoryWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="振り分け履歴"
+        xmlns:loc="clr-namespace:Classify8.Localization"
+        Title="{loc:Tr history.title}"
         Height="500"
         Width="1000"
         WindowStartupLocation="CenterOwner"
@@ -16,36 +17,36 @@
 
             <DataGrid.ContextMenu>
                 <ContextMenu>
-                    <MenuItem Header="振り分け元フォルダを開く"
+                    <MenuItem Header="{loc:Tr common.open_source}"
                               Click="MenuOpenSource_Click"/>
-                    <MenuItem Header="振り分け先フォルダを開く"
+                    <MenuItem Header="{loc:Tr common.open_dest}"
                               Click="MenuOpenDest_Click"/>
                     <Separator/>
-                    <MenuItem Header="振り分けルールを開く"
+                    <MenuItem Header="{loc:Tr history.open_rule}"
                               Click="MenuOpenRule_Click"/>
                 </ContextMenu>
             </DataGrid.ContextMenu>
 
             <DataGrid.Columns>
-                <DataGridTextColumn Header="日時"
+                <DataGridTextColumn Header="{loc:Tr history.col.time}"
                                     Binding="{Binding Timestamp, StringFormat=yyyy/MM/dd HH:mm:ss}"
                                     Width="140"/>
-                <DataGridTextColumn Header="状態"
-                                    Binding="{Binding Status}"
-                                    Width="60"/>
-                <DataGridTextColumn Header="ルール名"
+                <DataGridTextColumn Header="{loc:Tr history.col.status}"
+                                    Binding="{Binding StatusDisplay}"
+                                    Width="150"/>
+                <DataGridTextColumn Header="{loc:Tr history.col.rule}"
                                     Binding="{Binding RuleName}"
                                     Width="150"/>
-                <DataGridTextColumn Header="ファイル名"
+                <DataGridTextColumn Header="{loc:Tr history.col.file}"
                                     Binding="{Binding FileName}"
                                     Width="150"/>
-                <DataGridTextColumn Header="変更後ファイル名"
+                <DataGridTextColumn Header="{loc:Tr history.col.new_file}"
                                     Binding="{Binding NewFileName}"
                                     Width="150"/>
-                <DataGridTextColumn Header="振り分け元"
+                <DataGridTextColumn Header="{loc:Tr common.source}"
                                     Binding="{Binding SourceDir}"
                                     Width="150"/>
-                <DataGridTextColumn Header="振り分け先"
+                <DataGridTextColumn Header="{loc:Tr common.dest}"
                                     Binding="{Binding DestDir}"
                                     Width="*"/>
             </DataGrid.Columns>
