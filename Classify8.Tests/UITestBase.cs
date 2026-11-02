@@ -33,7 +33,9 @@ namespace Classify8.Tests
             string exePath = CreateSandbox(builtExe);
 
             // アプリ起動
-            App = Application.Launch(exePath);
+            var startInfo = new ProcessStartInfo(exePath);
+            ConfigureLaunch(startInfo);
+            App = Application.Launch(startInfo);
             Thread.Sleep(2000); // 起動待機
 
             MainWindow = App.GetMainWindow(Automation, TimeSpan.FromSeconds(5));
@@ -61,8 +63,18 @@ namespace Classify8.Tests
             }
 
             Automation?.Dispose();
+            OnAppClosed();
             DeleteSandbox();
         }
+
+        /// <summary>アプリを起動する前に、起動の設定 (環境変数など) を変えたいテストが上書きする</summary>
+        protected virtual void ConfigureLaunch(ProcessStartInfo startInfo) { }
+
+        /// <summary>アプリを閉じた後、サンドボックスを消す前に、追加の後片付けをしたいテストが上書きする</summary>
+        protected virtual void OnAppClosed() { }
+
+        /// <summary>アプリのコピーを置いたフォルダ</summary>
+        protected string SandboxDir => _sandboxDir;
 
         // --- サンドボックス (アプリのコピー) ---------------------------------------
 

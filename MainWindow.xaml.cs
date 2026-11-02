@@ -22,6 +22,7 @@ namespace Classify8
         public AppSettings CurrentSettings { get; set; }
 
         private System.Windows.Threading.DispatcherTimer _periodicTimer;
+        private bool _runtimeNoticeShown; // .NET の更新による再起動の案内を、定周期実行で出したか
         private bool _isSorting = false;
         private ProgressWindow _progressWin = null;
         private System.Windows.Forms.NotifyIcon _notifyIcon;
@@ -522,15 +523,30 @@ namespace Classify8
         // 共通の実行エンジン
         private async System.Threading.Tasks.Task ExecuteSortingAsync(List<SortRuleViewModel> targetRules, bool isAutoExecution = false)
         {
-            if (targetRules.Count == 0) return;
-
             if (_isSorting)
             {
                 if (!isAutoExecution) Log(Loc.T("log.already_running"));
                 return;
             }
 
+            // 起動中に .NET が更新されてファイルが消えていると、処理の途中で失敗するため、始める前に止める
+            if (!App.IsRuntimeIntact())
+            {
+                Log(Loc.T("log.runtime_updated"));
+
+                // 定周期実行では、知らせるのは1回だけにする (間隔ごとにメッセージが出続けないように)
+                if (!isAutoExecution || !_runtimeNoticeShown)
+                {
+                    _runtimeNoticeShown = true;
+                    App.PromptRestartForRuntimeUpdate();
+                }
+                return;
+            }
+
+            if (targetRules.Count == 0) return;
+
             _isSorting = true;
+            bool runtimeUpdated = false;
             var cts = new System.Threading.CancellationTokenSource();
             _currentCts = cts;
 
@@ -817,6 +833,12 @@ namespace Classify8
                 // async void から呼ばれることがあるため、ここで受け止めてアプリが落ちないようにする
                 AppLog.Error("An unexpected exception occurred during sorting.", ex);
                 Log(Loc.F("log.fatal", ex.Message));
+
+                if (RuntimeFileCheck.IsAssemblyLoadError(ex) && !App.IsRuntimeIntact())
+                {
+                    Log(Loc.T("log.runtime_updated"));
+                    runtimeUpdated = true;
+                }
             }
             finally
             {
@@ -844,6 +866,11 @@ namespace Classify8
                 {
                     // (戻り値は待たずに破棄する。ここで待つと、閉じる処理と自分自身が互いに待ち合ってしまう)
                     _ = Dispatcher.BeginInvoke(new Action(() => Close()));
+                }
+                else if (runtimeUpdated)
+                {
+                    _runtimeNoticeShown = true;
+                    _ = Dispatcher.BeginInvoke(new Action(App.PromptRestartForRuntimeUpdate));
                 }
             }
         }
@@ -1295,7 +1322,19 @@ namespace Classify8
             }
 
             this.Activate(); // メイン画面を最前面へ持ってくる
+
+            // 起動中に .NET が更新されていたら、操作を始める前に再起動を勧める
+            if (!App.IsRuntimeIntact())
+            {
+                _ = Dispatcher.BeginInvoke(new Action(App.PromptRestartForRuntimeUpdate));
+            }
         }
+
+        /// <summary>振り分け処理を実行中か</summary>
+        public bool IsSorting => _isSorting;
+
+        /// <summary>振り分けの後始末が済んだら閉じる予定か (実行中に終了を選んだ場合)</summary>
+        public bool IsExitPending => _exitRequested;
 
         // 最小化ボタン「_」が押された時、タスクバーから消してトレイのみにする
         protected override void OnStateChanged(EventArgs e)

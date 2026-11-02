@@ -5,17 +5,22 @@
              StartupUri="MainWindow.xaml">
      <Application.Resources>
 
-          <!-- スペルチェック候補などを出さない、シンプルな右クリックメニュー -->
-          <ContextMenu x:Key="PlainTextBoxMenu">
+          <!-- スペルチェック候補などを出さない、シンプルな右クリックメニュー。
+               テキストボックスごとに作り (x:Shared=False)、コマンドの対象は右クリックされたテキストボックスにする -->
+          <ContextMenu x:Key="PlainTextBoxMenu" x:Shared="False">
                <MenuItem Header="{loc:Tr textmenu.cut}"
-                         Command="ApplicationCommands.Cut"/>
+                         Command="ApplicationCommands.Cut"
+                         CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                <MenuItem Header="{loc:Tr textmenu.copy}"
-                         Command="ApplicationCommands.Copy"/>
+                         Command="ApplicationCommands.Copy"
+                         CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                <MenuItem Header="{loc:Tr textmenu.paste}"
-                         Command="ApplicationCommands.Paste"/>
+                         Command="ApplicationCommands.Paste"
+                         CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                <Separator/>
                <MenuItem Header="{loc:Tr textmenu.select_all}"
-                         Command="ApplicationCommands.SelectAll"/>
+                         Command="ApplicationCommands.SelectAll"
+                         CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
           </ContextMenu>
 
           <!-- 全 TextBox に適用 -->
